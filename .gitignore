@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
-.env
+.devenv
+.prodenv
 
 data
+
+exported_model
