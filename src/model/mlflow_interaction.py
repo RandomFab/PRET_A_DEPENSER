@@ -6,7 +6,7 @@ from config.config import BASE_DIR, MODEL_DIR
 from config.logger import logger
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path=BASE_DIR / ".devenv")
 
 
 def set_tracking_uri(uri: Optional[str] = None) -> None:

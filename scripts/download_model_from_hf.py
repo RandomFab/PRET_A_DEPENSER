@@ -4,7 +4,7 @@ from config.config import BASE_DIR, MODEL_DIR
 from config.logger import logger
 from src.model.hf_interaction import download_model_from_hf
 
-load_dotenv()
+load_dotenv(dotenv_path=BASE_DIR / ".devenv")
 
 if __name__ == '__main__':
     repo_id = os.getenv('HF_REPO_ID')

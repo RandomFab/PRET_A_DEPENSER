@@ -1,15 +1,47 @@
 from fastapi import APIRouter
-import os
+from fastapi import HTTPException
 
-from config.config import MODEL_DIR
+import os
+from dotenv import load_dotenv
+
+from config.config import MODEL_DIR, BASE_DIR
 from config.logger import logger
 
+from src.model.hf_interaction import download_model_from_hf
+from src.model.model_service import get_model_signature,get_model_status
+
 router = APIRouter()
+load_dotenv(dotenv_path=BASE_DIR / ".devenv")
 
 @router.get("/router_health")
 async def router_health():
     return {'message':'Router is well linked to the app'}
 
+@router.get("/model_status")
+async def model_status():
+    
+    status = get_model_status()
+
+    if status["exists"]:
+        return {'message' : f'''Model ({status['model_name']}) is ready.\n
+                {status['model_name']} is saved at this location : {status['path']}\n
+                Model stats : size = {status['size_kb']}kb ; last modification = {status['last_modified']}'''}
+    else:
+        return {'message' : 'Model is not loaded and not ready for predictions.'}
+
+@router.get("/model_signature")
+async def model_status():
+    
+    signature = get_model_signature()
+
+    if signature["exists"]:
+        return {'message' : 'Model signature :',
+                'columns':signature['signature']['columns'],
+                'datas': signature['signature']['data'][0],
+                'nb_features':signature['nb_features']}
+    else:
+        return {'message' : 'No signature found'}
+    
 @router.post("/individual_score")
 async def individual_score():
     return {'message':'You have well landed on "individual_score" endpoint...'}
@@ -20,8 +52,7 @@ async def multiple_score():
 
 @router.post("/reload_model")
 async def reload_model():
-    from src.model.hf_interaction import download_model_from_hf
-    from fastapi import HTTPException
+
     
     repo_id = os.getenv('HF_REPO_ID')
     filename = os.getenv('HF_FILENAME', 'model.cb')
