@@ -139,15 +139,18 @@ def get_prediction(model: CatBoostClassifier, data_dict: dict):
         proba_array = model.predict_proba([ordered_values]) 
         proba = float(proba_array[0][1])
         
-        is_granted = proba >= best_threshold
-        message = "can't" if is_granted else "can"
+        # 1 = Défaut/Refusé, 0 = Accordé
+        is_refused = int(proba >= best_threshold)
+        decision = "Refusé" if is_refused == 1 else "Accordé"
 
-        result = {"message":f"the credit {message} be granted to the client",
-                "threshold_used": best_threshold,
-                "prediction":is_granted,
-                "probability":round(proba, 4)}
+        result = {
+            "score": round(proba, 4),
+            "prediction": is_refused,
+            "threshold": best_threshold,
+            "decision": decision
+        }
         
-        logger.info(f"✅ Prediction successful: Granted={is_granted}, Proba={round(proba, 4)}, threshold={round(best_threshold,2)},threshold_state={threshold_state}")
+        logger.info(f"✅ Prediction successful: Decision={decision}, Score={round(proba, 4)}, Threshold={best_threshold}")
         return result
 
     except Exception as e:

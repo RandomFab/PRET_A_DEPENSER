@@ -13,54 +13,99 @@ from src.model.model_service import (
     get_prediction,
     load_model_instance
 )
-from src.app.schemas import ScoringData
+from src.app.schemas import (
+    ScoringData, 
+    PredictionResponse, 
+    ModelStatusResponse, 
+    ModelSignatureResponse, 
+    ModelInfoResponse
+)
 
 router = APIRouter()
 load_dotenv(dotenv_path=BASE_DIR / ".devenv")
 
 @router.get("/router_health")
 async def router_health():
-    return {'message':'Router is well linked to the app'}
+    """Verifies the router is properly connected to the main application."""
+    try:
+        return {'message':'Router is well linked to the app'}
+    except Exception as e:
+        logger.error(f"❌ Router Health check failed: {e}")
+        raise HTTPException(status_code=500, detail="Router connection issue.")
 
-@router.get("/model_status")
+@router.get("/model_status", response_model=ModelStatusResponse)
 async def model_status():
-    
-    status = get_model_status()
+    """
+    Retrieve the status of the model file on disk.
+    Returns name, path, size and last modification time.
+    """
+    try:
+        status = get_model_status()
+        if not status["exists"]:
+            logger.warning("⚠️ Model status requested but model file is missing")
+            raise HTTPException(status_code=404, detail="Model file not found on disk.")
+        
+        return {
+            "message": f"Model ({status['model_name']}) is ready.",
+            "status": status
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error checking model status: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error while checking model status.")
 
-    if status["exists"]:
-        return {'message' : f'''Model ({status['model_name']}) is ready.\n
-                {status['model_name']} is saved at this location : {status['path']}\n
-                Model stats : size = {status['size_kb']}kb ; last modification = {status['last_modified']}'''}
-    else:
-        return {'message' : 'Model is not loaded and not ready for predictions.'}
-
-@router.get("/model_signature")
+@router.get("/model_signature", response_model=ModelSignatureResponse)
 async def model_signature():
-    
-    signature = get_model_signature()
+    """
+    Retrieve the model signature (expected input variables).
+    Provides the list of columns and total number of features.
+    """
+    try:
+        signature = get_model_signature()
+        if not signature["exists"]:
+            logger.warning("⚠️ Model signature requested but MLmodel file is missing")
+            raise HTTPException(status_code=404, detail="Signature file (MLmodel) not found.")
+        
+        return {
+            "message": "Model signature retrieved",
+            "columns": signature["columns"],
+            "nb_features": signature["nb_features"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error retrieving signature: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error while retrieving signature.")
 
-    if signature["exists"]:
-        return {'message' : 'Model signature :',
-                'columns':signature['columns'],
-                'nb_features':signature['nb_features']}
-    else:
-        return {'message' : 'No signature found'}
-
-@router.get("/model_info")
+@router.get("/model_info", response_model=ModelInfoResponse)
 async def model_info():
-    
-    infos = get_model_info()
+    """
+    Provide detailed information about the model.
+    Includes CatBoost version, MLflow ID, creation date and decision threshold.
+    """
+    try:
+        infos = get_model_info()
+        if not infos["exists"]:
+            logger.warning("⚠️ Model info requested but MLmodel metadata is missing")
+            raise HTTPException(status_code=404, detail="Model information not found.")
+        
+        return {"message": "Model info retrieved", "info": infos}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error retrieving model info: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error while retrieving model info.")
 
-    if infos["exists"]:
-        return {'message': 'Model info retrieved', 'info': infos}
-    else:
-        return {'message' : 'No infos found'}
-
-@router.post("/individual_score")
+@router.post("/individual_score", response_model=PredictionResponse)
 async def individual_score(
     request: Request, 
     data: ScoringData
 ):
+    """
+    Compute a creditworthiness score for an individual client.
+    Accepts client features and returns probability and credit decision.
+    """
     model = getattr(request.app.state, "model", None)
     if not model:
         logger.error("❌ Scoring failed: Model is not loaded in app state")
@@ -79,8 +124,12 @@ async def individual_score(
         logger.error(f"❌ Prediction error: {e}")
         raise HTTPException(status_code=500, detail=f"An internal error occurred during prediction: {str(e)}")
 
-@router.post("/multiple_score")
+@router.post("/multiple_score", response_model=list[PredictionResponse])
 async def multiple_score(request: Request, data_list: list[ScoringData]):
+    """
+    Perform batch predictions for a list of clients.
+    Returns a list of results with scores and decisions for each entry.
+    """
     model = getattr(request.app.state, "model", None)
     if not model:
         logger.error("❌ Bulk scoring failed: Model is not loaded")
@@ -89,15 +138,27 @@ async def multiple_score(request: Request, data_list: list[ScoringData]):
     try:
         # Conversion du batch en liste de dicts
         batch_dicts = [d.model_dump() for d in data_list]
-        results = [get_prediction(model, d) for d in batch_dicts]
+        results = []
+        for d in batch_dicts:
+            res = get_prediction(model, d)
+            if "error" in res:
+                # Si erreur dans un item, on stoppe ou on gère ? 
+                # On va lever une exception pour simplifier.
+                raise HTTPException(status_code=400, detail=f"Error in batch item: {res['error']}")
+            results.append(res)
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Bulk prediction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/reload_model")
 async def reload_model(request: Request):
-    
+    """
+    Trigger download of the latest model version from Hugging Face.
+    After download, the model is reloaded into RAM immediately.
+    """
     repo_id = os.getenv('HF_REPO_ID')
     filename = os.getenv('HF_FILENAME', 'model.cb')
     token = os.getenv('HUGGINGFACE_TOKEN', None)
