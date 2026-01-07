@@ -30,7 +30,7 @@ def upload_model_to_hf(local_file_path: str | Path, repo_id: str, path_in_repo: 
     if path_in_repo is None:
         path_in_repo = "." if local_path.is_dir() else local_path.name
 
-    logger.info(f"Uploading {local_path} to HF repo {repo_id} (path: {path_in_repo})")
+    logger.info(f"ℹ️ Uploading {local_path} to HF repo {repo_id} (path: {path_in_repo})")
     
     try:
         if local_path.is_dir():
@@ -55,10 +55,10 @@ def upload_model_to_hf(local_file_path: str | Path, repo_id: str, path_in_repo: 
                 token=token,
             )
             
-        logger.info(f"Upload successful: {result}")
+        logger.info(f"✅ Upload successful: {result}")
         return result
     except Exception as e:
-        logger.error(f"Failed to upload to HF: {e}")
+        logger.error(f"❌ Failed to upload to HF: {e}")
         raise
 
 
@@ -71,11 +71,11 @@ def download_model_from_hf(repo_id: str, filename: str, repo_type: str = "model"
     cache_dir = Path(cache_dir or MODEL_DIR)
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Downloading {filename} from {repo_id} to {cache_dir}")
+    logger.info(f"ℹ️ Downloading {filename} from {repo_id} to {cache_dir}")
     try:
         local_path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type=repo_type, token=token, cache_dir=str(cache_dir))
-        logger.info(f"Downloaded to {local_path}")
+        logger.info(f"✅ Downloaded to {local_path}")
         return local_path
     except Exception as e:
-        logger.error(f"Failed to download from HF: {e}")
+        logger.error(f"❌ Failed to download from HF: {e}")
         raise

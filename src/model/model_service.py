@@ -88,19 +88,28 @@ def load_model_instance():
     model_path = MODEL_DIR / filename
     
     if not model_path.exists():
+        logger.warning(f"⚠️ Model file not found at {model_path}")
         return None
         
-    model = CatBoostClassifier()
-    model.load_model(str(model_path))
-    return model
+    try:
+        logger.info(f"ℹ️ Loading model from {model_path}...")
+        model = CatBoostClassifier()
+        model.load_model(str(model_path))
+        logger.info(f"✅ Model loaded successfully from {filename}")
+        return model
+    except Exception as e:
+        logger.error(f"❌ Failed to load model: {e}")
+        return None
 
 def get_prediction(model: CatBoostClassifier, data_dict: dict):
     if model is None:
+        logger.error("❌ Prediction failed: No model instance provided")
         return {'error': 'Model instance is missing'}
     
     signature = get_model_signature()
 
     if not signature['exists']:
+        logger.error("❌ Prediction failed: Signature file 'MLmodel' not found")
         return {'error' : 'Signature file not found'}
     
     # Get columns to ordered values for the model
@@ -115,9 +124,11 @@ def get_prediction(model: CatBoostClassifier, data_dict: dict):
 
     infos =  get_model_info()
     best_threshold = infos.get('best_threshold')
+    threshold_state = "Best for this model"
     if best_threshold == None:
         best_threshold = 0.5
-        logger.warning("No threshold recommanded for ths model. A 0.5 threshold has been atttributed by default")
+        threshold_state = "0.5 by default"
+        logger.warning("⚠️ No threshold recommended for this model. A 0.5 threshold has been attributed by default")
 
     try:
         proba_array = model.predict_proba([ordered_values]) 
@@ -126,10 +137,14 @@ def get_prediction(model: CatBoostClassifier, data_dict: dict):
         is_granted = proba >= best_threshold
         message = "can" if is_granted else "can't"
 
-        return {"message":f"the credit {message} be granted to the client",
+        result = {"message":f"the credit {message} be granted to the client",
                 "threshold_used": best_threshold,
                 "prediction":is_granted,
                 "probability":round(proba, 4)}
+        
+        logger.info(f"✅ Prediction successful: Granted={is_granted}, Proba={round(proba, 4)}, threshold={round(best_threshold,2)},threshold_state={threshold_state}")
+        return result
 
     except Exception as e:
+        logger.error(f"❌ Prediction computation error: {e}")
         return {"error": str(e)}

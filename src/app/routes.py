@@ -54,32 +54,37 @@ async def model_info():
         return {'message': 'Model info retrieved', 'info': infos}
     else:
         return {'message' : 'No infos found'}
-    
+
 @router.post("/individual_score")
 async def individual_score(request: Request, data: dict):
     model = getattr(request.app.state, "model", None)
     if not model:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+        logger.error("❌ Scoring failed: Model is not loaded in app state")
+        raise HTTPException(status_code=503, detail="Model is currently not loaded on the server. Please reload it.")
     
     try:
         results = get_prediction(model, data)
+        if "error" in results:
+            raise HTTPException(status_code=400, detail=results["error"])
         return results
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Prediction error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Prediction error: {e}")
+        raise HTTPException(status_code=500, detail=f"An internal error occurred during prediction: {str(e)}")
 
 @router.post("/multiple_score")
 async def multiple_score(request: Request, data_list: list[dict]):
     model = getattr(request.app.state, "model", None)
     if not model:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+        logger.error("❌ Bulk scoring failed: Model is not loaded")
+        raise HTTPException(status_code=503, detail="Model is not loaded")
     
     try:
-        # On pourrait optimiser ici mais pour l'instant un par un
         results = [get_prediction(model, d) for d in data_list]
         return results
     except Exception as e:
-        logger.error(f"Prediction error: {e}")
+        logger.error(f"❌ Bulk prediction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/reload_model")
@@ -90,18 +95,23 @@ async def reload_model(request: Request):
     token = os.getenv('HUGGINGFACE_TOKEN', None)
 
     if not repo_id:
-        logger.error('HF_REPO_ID has not been declared in your environment.')
+        logger.error('❌ HF_REPO_ID has not been declared in your environment.')
         raise HTTPException(status_code=500, detail="HF_REPO_ID is not configured")
 
     try:
-        logger.info(f"Downloading {filename} from {repo_id}...")
+        logger.info(f"ℹ️ Manual reload requested. Downloading {filename} from {repo_id}...")
         local_path = download_model_from_hf(repo_id, filename, token=token, cache_dir=MODEL_DIR)
-        logger.info(f"Model saved to: {local_path}")
-
+        
         # Recharge le modèle en mémoire
-        request.app.state.model = load_model_instance()
-
-        return {'message':'Last version model has been well retrieved from HF and reloaded.'}
+        new_model = load_model_instance()
+        if new_model:
+            request.app.state.model = new_model
+            logger.info("✅ Model reloaded and updated in app state")
+            return {'message':'✅ Last version model has been well retrieved from HF and reloaded in memory.'}
+        else:
+            logger.error("❌ Reload failed: Failed to create model instance from downloaded file")
+            raise HTTPException(status_code=500, detail="Failed to load the downloaded model into memory.")
+            
     except Exception as e :
-        logger.error(f'An error occured : {e}')
+        logger.error(f'❌ Reload error: {e}')
         raise HTTPException(status_code=500, detail=f"Failed to reload model: {str(e)}")
