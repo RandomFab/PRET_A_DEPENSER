@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=BASE_DIR / ".devenv")
 
-
+# run server : mlflow server --backend-store-uri file:///C:/Users/Fabien/Desktop/OC/P6/OPTION_B/mlruns --default-artifact-root file:///C:/Users/Fabien/Desktop/OC/P6/OPTION_B/mlartifacts --host 127.0.0.1 --port 5000
 def set_tracking_uri(uri: Optional[str] = None) -> None:
     """Set MLflow tracking URI from argument or env var."""
     uri = uri or os.getenv('MLFLOW_TRACKING_URI')

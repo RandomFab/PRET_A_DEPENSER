@@ -1,0 +1,11 @@
+.git
+.gitignore
+.devenv
+.prodenv
+.venv
+__pycache__
+data
+exported_model
+tests
+notebooks
+README.md

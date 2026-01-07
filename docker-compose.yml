@@ -6,5 +6,7 @@
       - "8501:8501"
     volumes:
       - .:/app
+    env_file:
+      - .devenv
     environment:
       - ENV=development
