@@ -13,6 +13,7 @@ from src.model.model_service import (
     get_prediction,
     load_model_instance
 )
+from src.app.schemas import ScoringData
 
 router = APIRouter()
 load_dotenv(dotenv_path=BASE_DIR / ".devenv")
@@ -56,14 +57,19 @@ async def model_info():
         return {'message' : 'No infos found'}
 
 @router.post("/individual_score")
-async def individual_score(request: Request, data: dict):
+async def individual_score(
+    request: Request, 
+    data: ScoringData
+):
     model = getattr(request.app.state, "model", None)
     if not model:
         logger.error("❌ Scoring failed: Model is not loaded in app state")
         raise HTTPException(status_code=503, detail="Model is currently not loaded on the server. Please reload it.")
     
     try:
-        results = get_prediction(model, data)
+        # On convertit l'objet Pydantic en dict pour le service
+        data_dict = data.model_dump()
+        results = get_prediction(model, data_dict)
         if "error" in results:
             raise HTTPException(status_code=400, detail=results["error"])
         return results
@@ -74,14 +80,16 @@ async def individual_score(request: Request, data: dict):
         raise HTTPException(status_code=500, detail=f"An internal error occurred during prediction: {str(e)}")
 
 @router.post("/multiple_score")
-async def multiple_score(request: Request, data_list: list[dict]):
+async def multiple_score(request: Request, data_list: list[ScoringData]):
     model = getattr(request.app.state, "model", None)
     if not model:
         logger.error("❌ Bulk scoring failed: Model is not loaded")
         raise HTTPException(status_code=503, detail="Model is not loaded")
     
     try:
-        results = [get_prediction(model, d) for d in data_list]
+        # Conversion du batch en liste de dicts
+        batch_dicts = [d.model_dump() for d in data_list]
+        results = [get_prediction(model, d) for d in batch_dicts]
         return results
     except Exception as e:
         logger.error(f"❌ Bulk prediction error: {e}")

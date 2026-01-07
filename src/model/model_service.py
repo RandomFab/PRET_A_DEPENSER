@@ -41,9 +41,14 @@ def get_model_signature() -> dict:
     with open(MLmodel_path, 'r') as f:
         config = yaml.safe_load(f)
 
-    # Récupération sécurisée des données
-    signature = config.get('signature', {})
-    columns = signature.get('inputs', [])
+    # MLflow can store signature as a JSON string inside the YAML
+    raw_inputs = config.get('signature', {}).get('inputs', [])
+    if isinstance(raw_inputs, str):
+        import json
+        columns = json.loads(raw_inputs)
+    else:
+        columns = raw_inputs
+
     threshold = config.get('metadata', {}).get('best_threshold', None)
 
     return {
