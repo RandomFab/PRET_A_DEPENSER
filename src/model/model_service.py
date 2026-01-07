@@ -140,7 +140,7 @@ def get_prediction(model: CatBoostClassifier, data_dict: dict):
         proba = float(proba_array[0][1])
         
         is_granted = proba >= best_threshold
-        message = "can" if is_granted else "can't"
+        message = "can't" if is_granted else "can"
 
         result = {"message":f"the credit {message} be granted to the client",
                 "threshold_used": best_threshold,
