@@ -1,0 +1,36 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "🚀 Lancer API (FastAPI)",
+            "type": "shell",
+            "command": "uv run uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --reload",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "📊 Lancer Serveur MLflow",
+            "type": "shell",
+            "command": "mlflow server --host 0.0.0.0 --port 5000",
+            "group": "none",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "📤 Upload Modèle vers HF",
+            "type": "shell",
+            "command": "uv run -m scripts.upload_model_to_hf",
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}
