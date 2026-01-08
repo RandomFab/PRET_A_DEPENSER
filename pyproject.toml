@@ -9,4 +9,10 @@ dependencies = [
     "fastapi[standard]>=0.128.0",
     "huggingface-hub>=1.2.3",
     "mlflow>=3.8.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
