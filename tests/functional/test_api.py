@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
-from src.app.schemas import ScoringData
-from src.app.main import app as fastapi_app
+from src.api.schemas import ScoringData
+from src.api.main import app as fastapi_app
 
 class TestApiRoutes:
     

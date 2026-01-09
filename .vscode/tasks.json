@@ -41,6 +41,16 @@
                 "reveal": "always",
                 "panel": "new"
             }
+        },
+        {
+            "label": "🚀 Lancer Frontend (Streamlit)",
+            "type": "shell",
+            "command": "uv run streamlit run src/frontend/main.py",
+            "group": "none",
+                "presentation": {
+            "reveal": "always",
+            "panel": "new"
+            }
         }
     ]
 }
