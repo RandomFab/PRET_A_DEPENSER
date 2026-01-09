@@ -150,12 +150,18 @@ class ModelStatusResponse(BaseModel):
     message: str
     status: dict | None = None
 
+class FeatureSchema(BaseModel):
+    name: str
+    type: str
+    description: str | None = None
+    required: bool = True
+
 class ModelSignatureResponse(BaseModel):
     """
     Signature technique (colonnes attendues).
     """
     message: str
-    columns: list[str] | None = None
+    columns: list[FeatureSchema] | None = None
     nb_features: int | None = None
 
 class ModelInfoResponse(BaseModel):
