@@ -139,16 +139,16 @@ st.markdown("""
     
     /* 4. Style de l'onglet ACTIF (la boîte sélectionnée) */
     div[data-baseweb="tab-list"] button[aria-selected="true"] {
-        background-color: #1e2431 !important; /* Rouge Streamlit ou ta couleur */
+        background-color: #262730 !important; /* Rouge Streamlit ou ta couleur */
         color: white !important;             /* Texte en blanc */
-        border-color: #1e2431 !important;
+        border-color: #262730 !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
     }
 
     /* 5. Effet au survol (hover) */
     div[data-baseweb="tab-list"] button:hover {
-        border-color: #1e2431 !important;
-        background-color: #1e2431 !important;
+        border-color: #262730 !important;
+        background-color: #262730 !important;
         color: white !important;  /* Texte en blanc au survol */
     }
 
@@ -159,42 +159,67 @@ with st.container(border=True,horizontal=True ,horizontal_alignment='center'):
     sco_indiv,sco_csv = st.tabs(['Scoring Manuel','Scoring CSV'])
 
 with sco_indiv:
-    st.markdown("## Scoring Manuel")
-    st.markdown("<p style='color:#757575'>Renseignez les champs pour obtenir un score</p>",unsafe_allow_html=True)
+    with st.form("scoring"):
+        st.markdown("## Scoring Manuel")
+        st.markdown("<p style='color:#757575'>Renseignez les champs pour obtenir un score</p>",unsafe_allow_html=True)
 
-    if fields:
-        # Grille de 3 colonnes par défaut
-        cols_per_row = 3
-        for i in range(0, len(fields), cols_per_row):
-            row_fields = fields[i:i+cols_per_row]
-            cols = st.columns(cols_per_row)
-            for j, field_info in enumerate(row_fields):
-                # Extraction des infos (supporte dict pour MLflow ou str pour simple liste)
-                if isinstance(field_info, dict):
-                    field_name = field_info.get("name")
-                    field_type = field_info.get("type", "double")
-                    field_desc = field_info.get("description")
-                else:
-                    field_name = field_info
-                    field_type = "double"
-                    field_desc = None
-                
-                # On concatène le type technique et la description métier
-                help_parts = []
-                if field_desc:
-                    help_parts.append(f"**Description**: {field_desc}")
-                help_parts.append(f"*Type technique: {field_type}*")
-                help_text = "\n\n".join(help_parts)
-                
-                with cols[j]:
-                    if field_type in ["integer", "long"]:
-                        st.number_input(field_name, key=f"in_{field_name}", value=0, step=1, help=help_text)
-                    elif field_type == "boolean":
-                        st.selectbox(field_name, options=[True, False], key=f"in_{field_name}", help=help_text)
+        if fields:
+            # Grille de 3 colonnes par défaut
+            cols_per_row = 3
+            for i in range(0, len(fields), cols_per_row):
+                row_fields = fields[i:i+cols_per_row]
+                cols = st.columns(cols_per_row)
+                for j, field_info in enumerate(row_fields):
+                    # Extraction des infos (supporte dict pour MLflow ou str pour simple liste)
+                    if isinstance(field_info, dict):
+                        field_name = field_info.get("name")
+                        field_type = field_info.get("type", "double")
+                        field_desc = field_info.get("description")
                     else:
-                        st.number_input(field_name, key=f"in_{field_name}", value=0.0, help=help_text)
-    else:
-        st.error("Impossible de récupérer la signature du modèle (Vérifiez que l'API est lancée)")
+                        field_name = field_info
+                        field_type = "double"
+                        field_desc = None
+                    
+                    # On concatène le type technique et la description métier
+                    help_parts = []
+                    if field_desc:
+                        help_parts.append(f"**Description**: {field_desc}")
+                    help_parts.append(f"*Type technique: {field_type}*")
+                    help_text = "\n\n".join(help_parts)
+                    
+                    with cols[j]:
+                        if field_type in ["integer", "long"]:
+                            st.number_input(field_name, key=f"in_{field_name}", value=0, step=1, help=help_text)
+                        elif field_type == "boolean":
+                            st.selectbox(field_name, options=[True, False], key=f"in_{field_name}", help=help_text)
+                        else:
+                            st.number_input(field_name, key=f"in_{field_name}", value=0.0, help=help_text)
+        else:
+            st.error("Impossible de récupérer la signature du modèle (Vérifiez que l'API est lancée)")
+        
+        submitted = st.form_submit_button("Calculer mon score",use_container_width=True)
+
+    if submitted:
+        try:
+            # Construction correcte du dictionnaire de paramètres
+            params = {field.get('name'): st.session_state.get(f"in_{field.get('name')}") for field in fields}
+
+            # Envoi synchrone à l'API (on peut rendre asynchrone si besoin)
+            response = requests.post("http://localhost:8000/individual_score", json=params, timeout=10)
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('decision') == "Refusé" :
+                    st.error(f"Décision : Ce profile est {result.get('decision').lower()}")
+                else : 
+                    st.success(f"Décision : Ce profile est {result.get('decision').lower()}")
+                st.markdown(f"""**Informations complémentaires** :  
+                        - Probabilité : {result.get('score')} ;  
+                        - Threshold : {result.get('threshold')} ;  
+                        - Prédiction : {result.get('prediction')} / {result.get('decision')}""")
+            else:
+                st.error(f"Erreur API : {response.status_code} - {response.text}")
+        except Exception as e:
+            st.error(f"Erreur lors de l'envoi : {e}")
 
 
 with sco_csv:
