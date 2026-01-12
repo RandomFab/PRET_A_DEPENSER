@@ -31,15 +31,22 @@ class TestApiRoutes:
 
     def test_prediction_nominal(self, client, sample_payload):
         """Happy Path for a prediction."""
-        response = client.post("/individual_score", json=sample_payload)
-        assert response.status_code == 200
-        
-        json_resp = response.json()
-        assert "score" in json_resp
-        assert "decision" in json_resp
-        assert 0.0 <= json_resp["score"] <= 1.0
-        # Check DummyModel (fixed at 0.42 in conftest.py)
-        assert json_resp["score"] == 0.42
+        # Mock signature/info implies we don't rely on real MLmodel files (missing in CI)
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+            
+            response = client.post("/individual_score", json=sample_payload)
+            assert response.status_code == 200
+            
+            json_resp = response.json()
+            assert "score" in json_resp
+            assert "decision" in json_resp
+            assert 0.0 <= json_resp["score"] <= 1.0
+            # Check DummyModel (fixed at 0.42 in conftest.py)
+            assert json_resp["score"] == 0.42
 
     def test_prediction_validation_error(self, client, sample_payload):
         """Verifies rejection if data is invalid."""
@@ -53,10 +60,16 @@ class TestApiRoutes:
 
     def test_prediction_idempotency(self, client, sample_payload):
         """Verifies determinism: 2 identical calls = same result."""
-        resp1 = client.post("/individual_score", json=sample_payload)
-        resp2 = client.post("/individual_score", json=sample_payload)
-        
-        assert resp1.json() == resp2.json()
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+            
+            resp1 = client.post("/individual_score", json=sample_payload)
+            resp2 = client.post("/individual_score", json=sample_payload)
+            
+            assert resp1.json() == resp2.json()
 
     def test_security_extra_fields(self, client, sample_payload):
         """Verifies behavior with unknown fields (security).
@@ -66,31 +79,37 @@ class TestApiRoutes:
         payload = sample_payload.copy()
         payload["SQL_INJECTION"] = "DROP TABLE users;"
         
-        response = client.post("/individual_score", json=payload)
-        # If configured to ignore, it should pass 200. If forbid, 422.
-        # In current schemas.py, it is default (ignore), so 200 expected.
-        assert response.status_code == 200 
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+            
+            response = client.post("/individual_score", json=payload)
+            # If configured to ignore, it should pass 200. If forbid, 422.
+            # In current schemas.py, it is default (ignore), so 200 expected.
+            assert response.status_code == 200 
 
     # --- Error Handling & Boundaries Tests ---
 
     def test_model_status_error(self, client):
         """Simulates an internal error when checking model status."""
         # We patch the function imported in routes.py
-        with patch("src.app.routes.get_model_status", side_effect=Exception("Disk failure")):
+        with patch("src.api.routes.get_model_status", side_effect=Exception("Disk failure")):
             response = client.get("/model_status")
             assert response.status_code == 500
             assert "Internal server error" in response.json()["detail"]
 
     def test_model_signature_error(self, client):
         """Simulates an internal error when retrieving model signature."""
-        with patch("src.app.routes.get_model_signature", side_effect=Exception("Corrupted file")):
+        with patch("src.api.routes.get_model_signature", side_effect=Exception("Corrupted file")):
             response = client.get("/model_signature")
             assert response.status_code == 500
             assert "Internal server error" in response.json()["detail"]
 
     def test_model_info_error(self, client):
         """Simulates an internal error when retrieving model info."""
-        with patch("src.app.routes.get_model_info", side_effect=Exception("Unexpected structure")):
+        with patch("src.api.routes.get_model_info", side_effect=Exception("Unexpected structure")):
             response = client.get("/model_info")
             assert response.status_code == 500
             assert "Internal server error" in response.json()["detail"]
@@ -112,7 +131,7 @@ class TestApiRoutes:
 
     def test_prediction_internal_error(self, client, sample_payload):
         """Simulates a crash during value prediction."""
-        with patch("src.app.routes.get_prediction", side_effect=Exception("CatBoost crash")):
+        with patch("src.api.routes.get_prediction", side_effect=Exception("CatBoost crash")):
             response = client.post("/individual_score", json=sample_payload)
             assert response.status_code == 500
             assert "CatBoost crash" in response.json()["detail"]
@@ -124,15 +143,21 @@ class TestApiRoutes:
         # Create a batch with 2 identical items
         batch = [sample_payload, sample_payload]
         
-        response = client.post("/multiple_score", json=batch)
-        assert response.status_code == 200
-        
-        results = response.json()
-        assert isinstance(results, list)
-        assert len(results) == 2
-        # Check that both results are correct
-        assert results[0]["score"] == 0.42
-        assert results[1]["score"] == 0.42
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+
+            response = client.post("/multiple_score", json=batch)
+            assert response.status_code == 200
+            
+            results = response.json()
+            assert isinstance(results, list)
+            assert len(results) == 2
+            # Check that both results are correct
+            assert results[0]["score"] == 0.42
+            assert results[1]["score"] == 0.42
 
     def test_batch_prediction_model_not_loaded(self, client, sample_payload):
         """Verifies 503 if model not loaded during batch."""
@@ -156,7 +181,7 @@ class TestApiRoutes:
             {"score": 0.42, "decision": "Accepted"}
         ]
         
-        with patch("src.app.routes.get_prediction", side_effect=mock_returns):
+        with patch("src.api.routes.get_prediction", side_effect=mock_returns):
             batch = [sample_payload, sample_payload]
             # The route raises 400 immediately if ANY item fails
             response = client.post("/multiple_score", json=batch)
@@ -167,8 +192,8 @@ class TestApiRoutes:
 
     def test_reload_model_success(self, client):
         """Verifies model reload triggers download and update."""
-        with patch("src.app.routes.download_model_from_hf") as mock_dl, \
-             patch("src.app.routes.load_model_instance") as mock_load:
+        with patch("src.api.routes.download_model_from_hf") as mock_dl, \
+             patch("src.api.routes.load_model_instance") as mock_load:
             
             # Mock load_model_instance to return a 'NewModel'
             mock_load.return_value = "NewModelInstance"
@@ -187,15 +212,15 @@ class TestApiRoutes:
 
     def test_reload_model_failure_download(self, client):
         """Verifies behavior if download fails."""
-        with patch("src.app.routes.download_model_from_hf", side_effect=Exception("HF Down")):
+        with patch("src.api.routes.download_model_from_hf", side_effect=Exception("HF Down")):
             response = client.post("/reload_model")
             assert response.status_code == 500
             assert "HF Down" in response.json()["detail"]
 
     def test_reload_model_failure_load(self, client):
         """Verifies behavior if load fails (returns None)."""
-        with patch("src.app.routes.download_model_from_hf"), \
-             patch("src.app.routes.load_model_instance", return_value=None):
+        with patch("src.api.routes.download_model_from_hf"), \
+             patch("src.api.routes.load_model_instance", return_value=None):
             
             response = client.post("/reload_model")
             assert response.status_code == 500
@@ -206,21 +231,21 @@ class TestApiRoutes:
     def test_model_status_missing_file_warning(self, client):
         """Covers: ⚠️ Model status requested but model file is missing."""
         # We mock get_model_status directly from routes to return {'exists': False}
-        with patch("src.app.routes.get_model_status", return_value={"exists": False, "model_name": "m.cb"}):
+        with patch("src.api.routes.get_model_status", return_value={"exists": False, "model_name": "m.cb"}):
             response = client.get("/model_status")
             assert response.status_code == 404
             assert "Model file not found" in response.json()["detail"]
 
     def test_model_signature_missing_file_warning(self, client):
         """Covers: ⚠️ Model signature requested but MLmodel file is missing."""
-        with patch("src.app.routes.get_model_signature", return_value={"exists": False}):
+        with patch("src.api.routes.get_model_signature", return_value={"exists": False}):
             response = client.get("/model_signature")
             assert response.status_code == 404
             assert "Signature file (MLmodel) not found" in response.json()["detail"]
 
     def test_model_info_missing_file_warning(self, client):
         """Covers: ⚠️ Model info requested but MLmodel metadata is missing."""
-        with patch("src.app.routes.get_model_info", return_value={"exists": False}):
+        with patch("src.api.routes.get_model_info", return_value={"exists": False}):
             response = client.get("/model_info")
             assert response.status_code == 404
             assert "Model information not found" in response.json()["detail"] 

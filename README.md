@@ -86,49 +86,34 @@ Réponse de prédiction (exemple):
 
 **Arborescence principale**
 
-```
-Pret-à-Dépenser/
-│
-├── ⚙️ config/                        # Paramètres, chemins et logger
-│   ├── __init__.py
+```text
+PRET_A_DEPENSER/
+├── 📂 config/               # Configuration (chemins, logger, etc.)
 │   ├── config.py
 │   └── logger.py
-│
-├── 📦 exported_model/                # Artifacts exportés (à ignorer)
-│   ├── MLmodel
-│   ├── model.cb
-│   ├── input_example.json
-│   └── requirements.txt
-│
-├── 📂 data/
-│   ├── external/
-│   ├── raw/
+├── 📂 data/                 # Données (raw, processed)
 │   └── processed/
-│
-├── 🧰 scripts/                       # CLI helpers pour MLflow & HF
+│       └── scoring_template_app.csv
+├── 📂 scripts/              # Utilitaires HF (upload/download)
 │   ├── download_model_from_hf.py
-│   ├── upload_model_to_hf.py
-│   └── __init__.py
-│
-├── 💻 src/
-│   ├── app/
+│   └── upload_model_to_hf.py
+├── 📂 src/                  # Code source
+│   ├── 🎨 api/              # Backend FastAPI (Modèle, Routes, Schemas)
 │   │   ├── main.py
-│   │   ├── routes.py
 │   │   ├── model.py
+│   │   ├── routes.py
 │   │   └── schemas.py
-│   ├── model/
-│   │   ├── hf_interaction.py
-│   │   ├── mlflow_interaction.py
-│   │   └── model_service.py
-│   ├── data_prep/
-│   └── utils/
-│
-├── 🧪 tests/
-├── 🧾 README.md
-├── 📜 pyproject.toml
-├── 📦 requirements.txt
-├── 🐳 Dockerfile
-└── 🐳 docker-compose.yml
+│   ├── 🧠 app/              # Frontend Streamlit
+│   │   ├── main.py
+│   │   └── utils.py
+│   └── ⚙️ model/            # Logique métier & Hubs (MLflow, HF)
+│       ├── hf_interaction.py
+│       ├── mlflow_interaction.py
+│       └── model_service.py
+├── 🧪 tests/                # Tests unitaires et fonctionnels
+├── 🐳 Dockerfile            # Packaging Docker
+├── 🐙 docker-compose.yml    # Orchestration locale
+└── 🚀 start.sh             # Script de démarrage dual (API + App)
 ```
 
 **Architecture (flow principal)**
@@ -143,6 +128,7 @@ graph TB
 	G --> H[Store file in `MODEL_DIR`]
 	H --> I[load_model_instance and update `app.state`]
 ```
+--- 
 
 ```mermaid
 sequenceDiagram
@@ -177,59 +163,61 @@ Ces variables peuvent être mises dans `.devenv` (utilisé par le projet) ou exp
 
 ---
 
-## 🧰 Installation rapide
+## 🚀 Installation & Déploiement Local
 
-Prerequis: Python 3.13+
+### 🐍 Installation Développement (venv)
+Préréquis : **Python 3.13+** et **uv** (recommandé).
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-pip install -e .
-```
-
-Le projet s'appuie sur les dépendances listées dans `pyproject.toml`.
-
-### Lancer l'API localement (dev)
-
-La workspace contient une task pour démarrer l'API :
-
-```bash
-uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-L'UI interactive est disponible sur `http://localhost:8000/docs`.
-
-### Lancer le frontend Streamlit (dev)
-
-Le projet contient aussi une application Streamlit pour une UI de scoring. Vous pouvez la lancer avec la task VS Code ou la commande suivante :
-
-```bash
-uv run streamlit run src/app/main.py
-```
-
-L'interface Streamlit est accessible par défaut sur `http://localhost:8501`.
-
-### Lancer MLflow (optionnel)
-
-```bash
-mlflow server --host 0.0.0.0 --port 5000
-```
+1.  **Cloner le dépôt** :
+    ```bash
+    git clone https://github.com/RandomFab/PRET_A_DEPENSER.git
+    cd PRET_A_DEPENSER
+    ```
+2.  **Installer les dépendances** :
+    ```bash
+    uv sync --frozen
+    ```
+3.  **Lancer séparément (Dev)** :
+    - **API** : `uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload`
+    - **App** : `uv run streamlit run src/app/main.py --server.port 7860`
 
 ---
 
-## 🐳 Docker
+## 🐳 Déploiement Local (Docker)
 
-Le `Dockerfile` du projet utilise le gestionnaire `uv` (voir Dockerfile). Le `docker-compose.yml` expose le port `8000`.
+La méthode la plus simple pour reproduire l'environnement de production.
+
+1.  **Configuration** : Créez un fichier `.devenv` avec vos tokens si nécessaire.
+2.  **Lancement** :
+    ```bash
+    docker compose up --build -d
+    ```
+3.  **Accès** :
+    - **Streamlit (UI)** : [http://localhost:7860](http://localhost:7860)
+    - **FastAPI (Docs)** : [http://localhost:8000/docs](http://localhost:8000/docs)
+
+Le conteneur utilise le script `start.sh` pour orchestrer le démarrage de l'API, attendre son initialisation, puis lancer l'interface Streamlit.  
+HF ne proposant qu'un port (7870), c'est la méthode la plus simple pour déployer le couple API + APP.  
+Un multi-conteners serait plus approprié sur un VPS par exemple.
 
 ---
 
-## 🧪 Tests
+## 🧪 Tests & Qualité
 
-Utilisez `pytest` pour lancer la suite de tests (si présente) :
+La suite de tests utilise `pytest` et génère un rapport de couverture.
 
 ```bash
-pytest -q
+uv run pytest --cov=src --cov-report=html
 ```
+Le rapport est généré dans `htmlcov/index.html`.
+
+---
+
+## 🤖 CI/CD (GitHub Actions)
+
+Le projet intègre une pipeline automatisée (`.github/workflows/ci-cd.yml`) :
+- **Test Job** : Exécuté sur `push/PR` (main & develop). Installe les dépendances, lance les tests et exporte le rapport de couverture.
+- **Deploiement Job** : Déclenche automatiquement le déploiement vers **Hugging Face Spaces** lors d'un push sur `main`.
 
 ---
 
