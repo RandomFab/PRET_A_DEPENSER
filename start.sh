@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# 0. Download the model before starting anything
+echo "📥 Downloading model from Hugging Face Hub..."
+uv run python -m scripts.download_model_from_hf
+
 # 1. Start FastAPI in the background
 # We use 'nohup' or just '&' to send it to the background.
 # Host 0.0.0.0 is important for internal networking within the container.
