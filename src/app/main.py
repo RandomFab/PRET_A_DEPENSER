@@ -3,7 +3,7 @@ import requests
 import sys
 from pathlib import Path
 import concurrent.futures
-from utils import csv_to_json
+from utils import *
 
 # Ajouter la racine du projet au chemin de recherche de modules
 root_path = Path(__file__).resolve().parent.parent.parent
@@ -74,35 +74,6 @@ else:
 columns_header= [9,1,1,1]
 
 # --- 1. FONCTIONS DE RÉCUPÉRATION (SANS CACHE POUR LE THREAD) ---
-
-def fetch_service_status(url):
-    """Effectue l'appel réseau pour le statut."""
-    try:
-        # Augmentation du timeout pour éviter le rouge au premier chargement
-        response = requests.get(url, timeout=5)
-        return "#28a745" if response.status_code == 200 else "#dc3545"
-    except:
-        return "#dc3545"
-
-@st.cache_data(ttl=300) # On cache la pastille HTML 5 minutes
-def get_cached_status_html(url, color):
-    return f"<span style='color: {color}; font-size: 15px;'>●</span>"
-
-@st.cache_data(ttl=3600) # Cache la signature 1h
-def get_model_signature_cached():
-    try:
-        response = requests.get("http://localhost:8000/model_signature", timeout=10)
-        if response.status_code == 200:
-            return response.json().get("columns", [])
-    except:
-        pass
-    return []
-
-# --- 2. GESTION DES APPELS ASYNCHRONES ---
-
-@st.cache_resource
-def get_executor():
-    return concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
 executor = get_executor()
 
@@ -329,22 +300,9 @@ with sco_csv:
         except Exception as e:
             st.error(f"Erreur lors de l'envoi : {e}")
 
-with st.container(border=True, horizontal=False, horizontal_alignment='center', width="stretch"):
+with st.expander("📖 Information du modèle"):
 
-    # Récupération sûre des informations du modèle
-    try:
-        resp = requests.get("http://localhost:8000/model_info", timeout=5)
-        resp.raise_for_status()
-        json_resp = resp.json()
-        model_infos = json_resp.get("info", {}) if isinstance(json_resp, dict) else {}
-    except requests.RequestException as e:
-        st.error(f"Impossible de joindre l'API /model_info : {e}")
-        model_infos = {}
-    except ValueError:
-        st.error("Réponse JSON invalide depuis /model_info")
-        model_infos = {}
-
-    st.markdown("## 📖 Information du modèle")
+    model_infos = model_info()
 
     # 2x2 grid : deux lignes, deux colonnes
     Model_type, nb_feature = st.columns(2)
@@ -366,12 +324,12 @@ with st.container(border=True, horizontal=False, horizontal_alignment='center', 
         st.write(model_infos.get('created_on', '—'))
 
     st.divider()
+    
+    st.button('Reload modèle', use_container_width=True, on_click=reload_model)
 
-    signature, reload = st.columns(2)
-    with signature:
-        st.button('Signature', use_container_width=True)
-    with reload:
-        st.button('Reload', use_container_width=True)
+with st.expander("✍🏻 Signature du modèle"):
+    df = model_signature()
+    st.dataframe(df)
 
 
 # --- 4. MISE À JOUR DES STATUTS (EN FIN DE SCRIPT) ---
