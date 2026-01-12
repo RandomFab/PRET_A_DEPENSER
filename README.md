@@ -1,3 +1,12 @@
+---
+title: 🚀 Pret-à-Dépenser
+emoji: 💰
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 <!-- Project title and badges -->
 # 🚀 Pret-à-Dépenser
 
