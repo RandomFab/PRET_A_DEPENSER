@@ -5,7 +5,11 @@
 .venv
 __pycache__
 data
-exported_model
 tests
 notebooks
 README.md
+htmlcov
+.pytest_cache
+.coverage
+**/*.pyc
+**/__pycache__
