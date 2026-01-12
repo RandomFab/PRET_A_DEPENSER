@@ -1,0 +1,109 @@
+import os
+from pathlib import Path
+from typing import Optional
+
+from huggingface_hub import HfApi, hf_hub_download, snapshot_download
+from config.config import BASE_DIR, MODEL_DIR
+from config.logger import logger
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=BASE_DIR / ".devenv")
+
+
+def _get_token(token: Optional[str]) -> Optional[str]:
+    return token or os.getenv("HUGGINGFACE_TOKEN")
+
+
+def upload_model_to_hf(local_file_path: str | Path, repo_id: str, path_in_repo: Optional[str] = None, *, token: Optional[str] = None, repo_type: str = "model", commit_message: str = "Upload model") -> dict:
+    """Upload a local file or folder to a Hugging Face model repo.
+    
+    If local_file_path is a directory, it uploads the entire folder content.
+    Returns the API response dict on success.
+    """
+    local_path = Path(local_file_path)
+    token = _get_token(token)
+    api = HfApi(token=token)
+    
+    # Si path_in_repo n'est pas spécifié :
+    # - pour un fichier : on garde le nom du fichier
+    # - pour un dossier : on upload à la racine du repo (path_in_repo=".")
+    if path_in_repo is None:
+        path_in_repo = "." if local_path.is_dir() else local_path.name
+
+    logger.info(f"ℹ️ Uploading {local_path} to HF repo {repo_id} (path: {path_in_repo})")
+    
+    try:
+        if local_path.is_dir():
+            # Upload de dossier complet
+            result = api.upload_folder(
+                folder_path=str(local_path),
+                path_in_repo=path_in_repo,
+                repo_id=repo_id,
+                repo_type=repo_type,
+                commit_message=commit_message,
+                token=token,
+                delete_patterns="*" # Écrase les anciennes versions (supprime tout avant upload)
+            )
+        else:
+            # Upload de fichier unique
+            result = api.upload_file(
+                path_or_fileobj=str(local_path),
+                path_in_repo=path_in_repo,
+                repo_id=repo_id,
+                repo_type=repo_type,
+                commit_message=commit_message,
+                token=token,
+            )
+            
+        logger.info(f"✅ Upload successful: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Failed to upload to HF: {e}")
+        raise
+
+
+def download_model_from_hf(repo_id: str, filename: str, repo_type: str = "model", *, token: Optional[str] = None, cache_dir: Optional[str | Path] = None) -> str:
+    """Download a file from a Hugging Face repo and return local path.
+
+    Example: download_model_from_hf('username/model', 'model.cb')
+    """
+    token = _get_token(token)
+    cache_dir = Path(cache_dir or MODEL_DIR)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"ℹ️ Downloading {filename} from {repo_id} to {cache_dir}")
+    try:
+        local_path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type=repo_type, token=token, cache_dir=str(cache_dir))
+        logger.info(f"✅ Downloaded to {local_path}")
+        return local_path
+    except Exception as e:
+        logger.error(f"❌ Failed to download from HF: {e}")
+        raise
+
+
+def download_repo_from_hf(repo_id: str, repo_type: str = "model", *, token: Optional[str] = None, local_dir: Optional[str | Path] = None) -> str:
+    """Download entire repo from Hugging Face to local directory (no cache structure).
+    
+    This uses snapshot_download with local_dir to get flat files.
+    """
+    token = _get_token(token)
+    local_dir = Path(local_dir or MODEL_DIR)
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"ℹ️ Downloading entire repo {repo_id} to {local_dir}")
+    try:
+        # local_dir allows downloading files directly to the folder structure
+        # local_dir_use_symlinks=False ensures we have actual files, not symlinks to cache
+        local_path = snapshot_download(
+            repo_id=repo_id, 
+            repo_type=repo_type, 
+            token=token, 
+            local_dir=str(local_dir), 
+            local_dir_use_symlinks=False
+        )
+        logger.info(f"✅ Repo downloaded to {local_path}")
+        return local_path
+    except Exception as e:
+        logger.error(f"❌ Failed to download repo from HF: {e}")
+        raise
+

@@ -1,0 +1,19 @@
+[project]
+name = "pret-a-depenser"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "catboost>=1.2.8",
+    "fastapi[standard]>=0.128.0",
+    "huggingface-hub>=1.2.3",
+    "mlflow>=3.8.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "streamlit>=1.52.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

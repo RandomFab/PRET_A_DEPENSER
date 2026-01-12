@@ -1,0 +1,15 @@
+.git
+.gitignore
+.devenv
+.prodenv
+.venv
+__pycache__
+data
+tests
+notebooks
+README.md
+htmlcov
+.pytest_cache
+.coverage
+**/*.pyc
+**/__pycache__
