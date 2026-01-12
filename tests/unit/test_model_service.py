@@ -74,4 +74,8 @@ metadata:
              sig = model_service.get_model_signature()
              
         assert len(sig["columns"]) == 3
-        assert sig["columns"] == ["A", "B", "C"]
+        assert sig["columns"] == [
+             {"name": "A", "type": "double", "description": None},
+             {"name": "B", "type": "double", "description": None},
+             {"name": "C", "type": "double", "description": None}
+        ]
