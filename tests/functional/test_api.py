@@ -31,15 +31,22 @@ class TestApiRoutes:
 
     def test_prediction_nominal(self, client, sample_payload):
         """Happy Path for a prediction."""
-        response = client.post("/individual_score", json=sample_payload)
-        assert response.status_code == 200
-        
-        json_resp = response.json()
-        assert "score" in json_resp
-        assert "decision" in json_resp
-        assert 0.0 <= json_resp["score"] <= 1.0
-        # Check DummyModel (fixed at 0.42 in conftest.py)
-        assert json_resp["score"] == 0.42
+        # Mock signature/info implies we don't rely on real MLmodel files (missing in CI)
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+            
+            response = client.post("/individual_score", json=sample_payload)
+            assert response.status_code == 200
+            
+            json_resp = response.json()
+            assert "score" in json_resp
+            assert "decision" in json_resp
+            assert 0.0 <= json_resp["score"] <= 1.0
+            # Check DummyModel (fixed at 0.42 in conftest.py)
+            assert json_resp["score"] == 0.42
 
     def test_prediction_validation_error(self, client, sample_payload):
         """Verifies rejection if data is invalid."""
@@ -53,10 +60,16 @@ class TestApiRoutes:
 
     def test_prediction_idempotency(self, client, sample_payload):
         """Verifies determinism: 2 identical calls = same result."""
-        resp1 = client.post("/individual_score", json=sample_payload)
-        resp2 = client.post("/individual_score", json=sample_payload)
-        
-        assert resp1.json() == resp2.json()
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+            
+            resp1 = client.post("/individual_score", json=sample_payload)
+            resp2 = client.post("/individual_score", json=sample_payload)
+            
+            assert resp1.json() == resp2.json()
 
     def test_security_extra_fields(self, client, sample_payload):
         """Verifies behavior with unknown fields (security).
@@ -66,10 +79,16 @@ class TestApiRoutes:
         payload = sample_payload.copy()
         payload["SQL_INJECTION"] = "DROP TABLE users;"
         
-        response = client.post("/individual_score", json=payload)
-        # If configured to ignore, it should pass 200. If forbid, 422.
-        # In current schemas.py, it is default (ignore), so 200 expected.
-        assert response.status_code == 200 
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+            
+            response = client.post("/individual_score", json=payload)
+            # If configured to ignore, it should pass 200. If forbid, 422.
+            # In current schemas.py, it is default (ignore), so 200 expected.
+            assert response.status_code == 200 
 
     # --- Error Handling & Boundaries Tests ---
 
@@ -124,15 +143,21 @@ class TestApiRoutes:
         # Create a batch with 2 identical items
         batch = [sample_payload, sample_payload]
         
-        response = client.post("/multiple_score", json=batch)
-        assert response.status_code == 200
-        
-        results = response.json()
-        assert isinstance(results, list)
-        assert len(results) == 2
-        # Check that both results are correct
-        assert results[0]["score"] == 0.42
-        assert results[1]["score"] == 0.42
+        mock_sig = {"exists": True, "columns": [{"name": k} for k in sample_payload.keys()]}
+        mock_info = {"best_threshold": 0.5}
+
+        with patch("src.model.model_service.get_model_signature", return_value=mock_sig), \
+             patch("src.model.model_service.get_model_info", return_value=mock_info):
+
+            response = client.post("/multiple_score", json=batch)
+            assert response.status_code == 200
+            
+            results = response.json()
+            assert isinstance(results, list)
+            assert len(results) == 2
+            # Check that both results are correct
+            assert results[0]["score"] == 0.42
+            assert results[1]["score"] == 0.42
 
     def test_batch_prediction_model_not_loaded(self, client, sample_payload):
         """Verifies 503 if model not loaded during batch."""
