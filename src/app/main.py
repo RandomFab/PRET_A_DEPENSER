@@ -3,6 +3,7 @@ import requests
 import sys
 from pathlib import Path
 import concurrent.futures
+from utils import csv_to_json
 
 # Ajouter la racine du projet au chemin de recherche de modules
 root_path = Path(__file__).resolve().parent.parent.parent
@@ -19,6 +20,50 @@ st.set_page_config(
     page_title="Prêt à dépenser - Scoring",
     page_icon=str(logo_path) if logo_path.exists() else "💰",
     layout="wide"
+)
+
+# Limiter la largeur de l'app et styliser simplement les boutons
+st.markdown(
+    """
+    <style>
+    /* Conteneur principal : largeur limitée et centré */
+    .block-container {
+        max-width: 50vw !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    @media (max-width: 900px) {
+        .block-container { max-width: 95vw !important; }
+    }
+
+    /* Boutons simples : vert, coins carrés, pas d'effet au survol */
+    .stButton>button,
+    .stDownloadButton>button,
+    form button,
+    div[data-testid="stForm"] button {
+        background-color: #1fad91 !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0.5rem 1rem !important;
+        box-shadow: none !important;
+        font-size: 1rem !important;
+        min-height: 40px !important;
+    }
+
+    /* Pas d'effet au survol : garder la même couleur */
+    .stButton>button:hover,
+    .stDownloadButton>button:hover,
+    form button:hover {
+        background-color: #1fad91 !important;
+        box-shadow: none !important;
+        outline: none !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 if logo_path.exists():
@@ -197,9 +242,9 @@ with sco_indiv:
         else:
             st.error("Impossible de récupérer la signature du modèle (Vérifiez que l'API est lancée)")
         
-        submitted = st.form_submit_button("Calculer mon score",use_container_width=True)
+        submitted_indiv = st.form_submit_button("Calculer mon score",use_container_width=True)
 
-    if submitted:
+    if submitted_indiv:
         try:
             # Construction correcte du dictionnaire de paramètres
             params = {field.get('name'): st.session_state.get(f"in_{field.get('name')}") for field in fields}
@@ -217,14 +262,116 @@ with sco_indiv:
                         - Threshold : {result.get('threshold')} ;  
                         - Prédiction : {result.get('prediction')} / {result.get('decision')}""")
             else:
-                st.error(f"Erreur API : {response.status_code} - {response.text}")
+                try:
+                    error_detail = response.json().get("detail", [])
+                    if response.status_code == 422 and isinstance(error_detail, list):
+                        msg = "\n".join([f"- **{err.get('loc', ['?'])[-1]}** : {err.get('msg')}" for err in error_detail])
+                        st.error(f"Données invalides :\n{msg}")
+                    else:
+                        st.error(f"Erreur API : {response.status_code} - {response.text}")
+                except Exception:
+                    st.error(f"Erreur API : {response.status_code} - {response.text}")
         except Exception as e:
             st.error(f"Erreur lors de l'envoi : {e}")
 
 
 with sco_csv:
-    st.write("Contenu pour l'import CSV...")
+    template_csv = BASE_DIR / 'src' / 'app' / "static" / "scoring_template_app.csv"
+    if template_csv.exists():
+        data_bytes = template_csv.read_bytes()
+        template_button = st.download_button(
+            label='Téléchargez le template',
+            data=data_bytes,
+            file_name='scoring_template.csv',
+            mime='text/csv',
+            icon=':material/download:'
+        )
+    else:
+        st.warning(f"Template CSV introuvable : {template_csv}")
 
+    uploader = st.file_uploader('Importez votre fichier "profile"...',accept_multiple_files=False, type='csv')
+
+    submitted_multi = st.button("Calculer les scores", use_container_width=True)
+
+    if submitted_multi:
+        try:
+            if uploader is None:
+                st.error("Aucun fichier CSV fourni. Importez un fichier avant de lancer le calcul.")
+            else:
+                payload = csv_to_json(uploader)
+                response = requests.post("http://localhost:8000/multiple_score", json=payload, timeout=30)
+                if response.status_code == 200:
+                    try:
+                        result = response.json()
+                        # Affiche le tableau des réponses renvoyées par l'endpoint
+                        import pandas as pd
+
+                        if isinstance(result, list):
+                            df = pd.DataFrame(result)
+                            st.markdown("**Résultats (tableau)**")
+                            st.dataframe(df)
+                        else:
+                            st.write(result)
+                    except Exception as exc:
+                        st.error(f"Impossible de parser la réponse JSON : {exc}")
+                else:
+                    try:
+                        error_detail = response.json().get("detail", [])
+                        if response.status_code == 422 and isinstance(error_detail, list):
+                            # Pour le batch, on affiche les premières erreurs pour ne pas flooder
+                            msg = "\n".join([f"- Ligne {err.get('loc', ['?'])[1] if len(err.get('loc', []))>1 else '?'} | **{err.get('loc', ['?'])[-1]}** : {err.get('msg')}" for err in error_detail[:10]])
+                            if len(error_detail) > 10: msg += "\n- ..."
+                            st.error(f"Erreur de validation (batch) :\n{msg}")
+                        else:
+                            st.error(f"Erreur API : {response.status_code} - {response.text}")
+                    except Exception:
+                        st.error(f"Erreur API : {response.status_code} - {response.text}")
+        except Exception as e:
+            st.error(f"Erreur lors de l'envoi : {e}")
+
+with st.container(border=True, horizontal=False, horizontal_alignment='center', width="stretch"):
+
+    # Récupération sûre des informations du modèle
+    try:
+        resp = requests.get("http://localhost:8000/model_info", timeout=5)
+        resp.raise_for_status()
+        json_resp = resp.json()
+        model_infos = json_resp.get("info", {}) if isinstance(json_resp, dict) else {}
+    except requests.RequestException as e:
+        st.error(f"Impossible de joindre l'API /model_info : {e}")
+        model_infos = {}
+    except ValueError:
+        st.error("Réponse JSON invalide depuis /model_info")
+        model_infos = {}
+
+    st.markdown("## 📖 Information du modèle")
+
+    # 2x2 grid : deux lignes, deux colonnes
+    Model_type, nb_feature = st.columns(2)
+    with Model_type:
+        st.markdown("#### Type de modèle")
+        st.write(model_infos.get('model_type', '—'))
+
+    with nb_feature:
+        st.markdown("#### Nombre de features")
+        st.write(model_infos.get('nb_feature', '—'))
+
+    Thershold, update = st.columns(2)
+    with Thershold:
+        st.markdown("#### Seuil de décision")
+        st.write(model_infos.get('best_threshold', '—'))
+
+    with update:
+        st.markdown("#### Dernière MàJ")
+        st.write(model_infos.get('created_on', '—'))
+
+    st.divider()
+
+    signature, reload = st.columns(2)
+    with signature:
+        st.button('Signature', use_container_width=True)
+    with reload:
+        st.button('Reload', use_container_width=True)
 
 
 # --- 4. MISE À JOUR DES STATUTS (EN FIN DE SCRIPT) ---
