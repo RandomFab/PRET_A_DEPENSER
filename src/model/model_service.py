@@ -5,6 +5,7 @@ from config.config import MODEL_DIR
 import yaml
 from catboost import CatBoostClassifier
 from config.logger import logger
+from src.api.schemas import ScoringData
 
 def get_model_status() -> dict:
         
@@ -49,12 +50,30 @@ def get_model_signature() -> dict:
     else:
         columns = raw_inputs
 
+    # Enrichir avec les descriptions du ScoringData
+    enriched_columns = []
+    pydantic_fields = ScoringData.model_fields
+    
+    for col in columns:
+        if isinstance(col, dict):
+            name = col.get("name")
+            # On récupère la description Pydantic si elle existe
+            field_info = pydantic_fields.get(name)
+            if field_info and field_info.description:
+                col["description"] = field_info.description
+            enriched_columns.append(col)
+        else:
+            # Si c'est juste une liste de strings
+            field_info = pydantic_fields.get(col)
+            desc = field_info.description if field_info else None
+            enriched_columns.append({"name": col, "type": "double", "description": desc})
+
     threshold = config.get('metadata', {}).get('best_threshold', None)
 
     return {
         "exists": True,
-        "columns": columns,
-        "nb_features": len(columns),
+        "columns": enriched_columns,
+        "nb_features": len(enriched_columns),
         "best_threshold": threshold
     }
 

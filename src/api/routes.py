@@ -13,7 +13,7 @@ from src.model.model_service import (
     get_prediction,
     load_model_instance
 )
-from src.app.schemas import (
+from src.api.schemas import (
     ScoringData, 
     PredictionResponse, 
     ModelStatusResponse, 

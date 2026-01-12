@@ -33,12 +33,12 @@ Automatiser une chaîne reproductible pour déployer un modèle CatBoost :
 
 ## 📡 Endpoints exposés
 
-L'application FastAPI se trouve dans `src/app/main.py` et expose les routes suivantes (sans préfixe) :
+L'application FastAPI se trouve dans `src/api/main.py` et expose les routes suivantes (sans préfixe). Le frontend Streamlit se trouve dans `src/app/main.py` et communique avec l'API pour afficher l'interface utilisateur :
 
 - `GET /` → redirection vers la documentation interactive `/docs`.
 - `GET /api_health` → état de santé global de l'API.
 
-Routes du routeur (`src/app/routes.py`):
+Routes du routeur (`src/api/routes.py`):
 - `GET /router_health` → health du router.
 - `GET /model_status` → état du fichier modèle sur disque (`model.cb`).
 - `GET /model_signature` → colonnes attendues (signature MLflow) et nombre de features.
@@ -194,10 +194,20 @@ Le projet s'appuie sur les dépendances listées dans `pyproject.toml`.
 La workspace contient une task pour démarrer l'API :
 
 ```bash
-uv run uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 L'UI interactive est disponible sur `http://localhost:8000/docs`.
+
+### Lancer le frontend Streamlit (dev)
+
+Le projet contient aussi une application Streamlit pour une UI de scoring. Vous pouvez la lancer avec la task VS Code ou la commande suivante :
+
+```bash
+uv run streamlit run src/app/main.py
+```
+
+L'interface Streamlit est accessible par défaut sur `http://localhost:8501`.
 
 ### Lancer MLflow (optionnel)
 

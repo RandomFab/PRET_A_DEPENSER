@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 from config.config import BASE_DIR, MODEL_DIR
 from config.logger import logger
 from dotenv import load_dotenv
@@ -79,3 +79,31 @@ def download_model_from_hf(repo_id: str, filename: str, repo_type: str = "model"
     except Exception as e:
         logger.error(f"❌ Failed to download from HF: {e}")
         raise
+
+
+def download_repo_from_hf(repo_id: str, repo_type: str = "model", *, token: Optional[str] = None, local_dir: Optional[str | Path] = None) -> str:
+    """Download entire repo from Hugging Face to local directory (no cache structure).
+    
+    This uses snapshot_download with local_dir to get flat files.
+    """
+    token = _get_token(token)
+    local_dir = Path(local_dir or MODEL_DIR)
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"ℹ️ Downloading entire repo {repo_id} to {local_dir}")
+    try:
+        # local_dir allows downloading files directly to the folder structure
+        # local_dir_use_symlinks=False ensures we have actual files, not symlinks to cache
+        local_path = snapshot_download(
+            repo_id=repo_id, 
+            repo_type=repo_type, 
+            token=token, 
+            local_dir=str(local_dir), 
+            local_dir_use_symlinks=False
+        )
+        logger.info(f"✅ Repo downloaded to {local_path}")
+        return local_path
+    except Exception as e:
+        logger.error(f"❌ Failed to download repo from HF: {e}")
+        raise
+

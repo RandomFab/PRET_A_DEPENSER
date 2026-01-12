@@ -1,6 +1,6 @@
 from pydantic import ValidationError
 import pytest
-from src.app.schemas import ScoringData
+from src.api.schemas import ScoringData
 
 class TestScoringDataValidation:
     

@@ -19,3 +19,5 @@ exported_model
 htmlcov
 
 .coverage
+
+logo/

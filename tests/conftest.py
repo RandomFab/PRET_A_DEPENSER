@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app.main import app
+from src.api.main import app
 from src.model import model_service as model_service_module
 
 
@@ -26,7 +26,7 @@ def client():
     - restores the original function after use
     """
     # We must patch where it is imported (src.app.main), because main.py does "from ... import ..."
-    from src.app import main
+    from src.api import main
     original_loader = getattr(main, "load_model_instance", None)
     
     try:
