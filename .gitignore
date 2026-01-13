@@ -9,8 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
-.devenv
-.prodenv
+.env*
+
 
 data
 

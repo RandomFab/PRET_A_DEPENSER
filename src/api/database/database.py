@@ -6,25 +6,28 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+ENV = os.getenv("APP_ENV", "development")
+# 2. On charge le fichier .env correspondant si on est en local
+if ENV == "development":
+    load_dotenv(".env.dev")
+elif ENV == "production":
+    # Sur HF, les variables sont déjà dans le système, pas besoin de fichier .env
+    pass
+SQLALCHEMY_DATABASE_URL = os.getenv('DATABASE_URL')
 
-user = os.getenv("DB_USER")
-password = os.getenv("DB_PASSWORD")
-host = os.getenv("DB_HOST")
-port = os.getenv("DB_PORT")
-db_name = os.getenv("DB_NAME")
+connect_args = {}
+if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
 
-SQLALCHEMY_DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False,bind=engine)
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """
     Objectif : Créer physiquement la table 'prediction_logs' dans Postgres
     si elle n'existe pas encore.
     """
-    Base.metadata.createall(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
 def get_db():
     db = SessionLocal()
