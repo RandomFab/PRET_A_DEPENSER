@@ -10,9 +10,11 @@ dependencies = [
     "huggingface-hub>=1.2.3",
     "mlflow>=3.8.1",
     "pandas>=2.2.3",
+    "psycopg2-binary>=2.9.11",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "requests>=2.32.3",
+    "sqlalchemy>=2.0.45",
     "streamlit>=1.52.2",
 ]
 
