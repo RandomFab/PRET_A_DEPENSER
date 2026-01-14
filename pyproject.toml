@@ -8,6 +8,7 @@ dependencies = [
     "catboost>=1.2.8",
     "fastapi[standard]>=0.128.0",
     "huggingface-hub>=1.2.3",
+    "ipykernel>=7.1.0",
     "mlflow>=3.8.1",
     "pandas>=2.2.3",
     "psycopg2-binary>=2.9.11",

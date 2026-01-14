@@ -14,7 +14,7 @@ class PredictionLog(Base):
     # Déclaration des colonne de la table :
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default = datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     model_version = Column(String)
     latency_ms = Column(Float)
     inputs = Column(JSON)
