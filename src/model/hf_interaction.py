@@ -7,7 +7,7 @@ from config.config import BASE_DIR, MODEL_DIR
 from config.logger import logger
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=BASE_DIR / ".devenv")
+load_dotenv()
 
 
 def _get_token(token: Optional[str]) -> Optional[str]:

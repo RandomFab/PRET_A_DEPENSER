@@ -7,7 +7,7 @@ from src.model.hf_interaction import upload_model_to_hf
 from src.model.mlflow_interaction import set_tracking_uri, download_model_artifacts, find_model_file
 from src.model.model_service import convert_catboost_to_onnx
 
-load_dotenv(dotenv_path=BASE_DIR / ".devenv")
+load_dotenv(BASE_DIR / ".env.dev")
 
 if __name__ == '__main__':
     repo_id = os.getenv('HF_REPO_ID')
