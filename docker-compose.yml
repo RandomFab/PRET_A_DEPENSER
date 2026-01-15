@@ -6,6 +6,6 @@
       - "7860:7860"
 
     env_file:
-      - .devenv
+      - .env.dev
     environment:
       - ENV=development

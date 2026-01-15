@@ -63,10 +63,20 @@
                 "panel": "new"
             }
         },
-                {
+        {
             "label": "🧪 Running profile_api",
             "type": "shell",
             "command": "uv run -m scripts.profile_api",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "🧪 Running benchmark",
+            "type": "shell",
+            "command": "uv run -m scripts.compare_cb_onnx",
             "group": "test",
             "presentation": {
                 "reveal": "always",
