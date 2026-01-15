@@ -33,9 +33,6 @@ jobs:
           pip install uv
           uv sync --frozen
 
-      - name: Run DB tests
-        run: python test_db_connection.py
-      
       - name: Lancer les tests avec couverture
         run: uv run pytest --maxfail=1 --disable-warnings -q --cov=. --cov-report=html
 
