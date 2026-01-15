@@ -23,6 +23,11 @@ pinned: false
 
 ---
 
+Le projet est déployé et testable en ligne sur Hugging Face Spaces :
+👉 **[Accéder à l'interface de Scoring](https://huggingface.co/spaces/RandomFab/pret-a-depenser)**
+
+---
+
 ## 🎯 Objectif
 
 Automatiser une chaîne complète de MLOps pour l'octroi de crédits, assurant la reproductibilité et la surveillance du modèle en production :
@@ -210,15 +215,19 @@ sequenceDiagram
 
 ---
 
-## ⚙️ Variables d'environnement (importantes)
+## ⚙️ Configuration & Environnement
 
-- `HF_REPO_ID` — identifiant du repo HF (ex: `username/model-repo`) requis pour `POST /reload_model`.
-- `HUGGINGFACE_TOKEN` — token HF (ou `HF_TOKEN`) pour accéder au repo privé.
-- `HF_FILENAME` — nom du fichier dans le repo HF (défaut `model.onnx`).
-- `DATABASE_URL` — Connection string PostgreSQL (ex: `postgresql://user:pass@host:5432/db`).
-- `MLFLOW_TRACKING_URI` — (optionnel) point vers le serveur MLflow.
+Le projet utilise des fichiers `.env` pour gérer la configuration de manière sécurisée et flexible.
 
-Ces variables peuvent être mises dans `.env.dev` (utilisé par le projet).
+-   **[.env.example](.env.example)** : Fichier modèle contenant toutes les clés nécessaires (sans les valeurs secrètes). **À copier pour créer vos propres fichiers d'environnement.**
+-   **`.env.dev`** : Utilisé pour le développement local. Il pointe généralement vers une base de données locale ou SQLite et active le mode debug.
+-   **`.env.prod`** : Utilisé lors du déploiement Docker et sur Hugging Face. Il contient les configurations de production (Base de données sécurisée, logs structurés, etc.).
+
+### Variables clés :
+- `HF_REPO_ID` — Identifiant du repo HF (ex: `username/model-repo`) requis pour le téléchargement auto du modèle.
+- `HUGGINGFACE_TOKEN` — Token HF pour accéder au repo (indispensable pour les modèles privés).
+- `DATABASE_URL` — Chaîne de connexion à la base de données (PostgreSQL en prod).
+- `MLFLOW_TRACKING_URI` — Point de terminaison du serveur MLflow pour le tracking.
 
 ---
 
