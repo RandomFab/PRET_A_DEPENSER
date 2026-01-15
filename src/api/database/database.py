@@ -6,13 +6,15 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
 ENV = os.getenv("APP_ENV", "development")
 # 2. On charge le fichier .env correspondant si on est en local
 if ENV == "development":
     load_dotenv(".env.dev")
 elif ENV == "production":
     # Sur HF, les variables sont déjà dans le système, pas besoin de fichier .env
-    pass
+    load_dotenv('.env.prod')
+
 SQLALCHEMY_DATABASE_URL = os.getenv('DATABASE_URL')
 
 connect_args = {}
