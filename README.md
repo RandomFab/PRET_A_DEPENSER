@@ -12,6 +12,7 @@ pinned: false
 
 [![Python](https://img.shields.io/badge/Python-3.13+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128+-green.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-1.17+-black.svg?logo=onnx&logoColor=white)](https://onnxruntime.ai/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![MLflow](https://img.shields.io/badge/MLflow-%3E%3D3.8.1-orange.svg?logo=mlflow&logoColor=white)](https://mlflow.org/)
 [![CatBoost](https://img.shields.io/badge/CatBoost-%3E%3D1.2.8-yellow.svg)](https://catboost.ai/)
@@ -25,7 +26,7 @@ pinned: false
 ## 🎯 Objectif
 
 Automatiser une chaîne complète de MLOps pour l'octroi de crédits, assurant la reproductibilité et la surveillance du modèle en production :
-- **Déploiement** d'un modèle CatBoost via une API **FastAPI**.
+- **Déploiement** d'un modèle CatBoost exporté au format **ONNX** via une API **FastAPI**.
 - **Tracking** des expériences et centralisation des artifacts avec **MLflow**.
 - **Historisation** des prédictions (inputs/outputs) dans **PostgreSQL**.
 - **Monitoring** de la qualité des données et du *Data Drift* avec **Evidently**.
@@ -35,11 +36,40 @@ Automatiser une chaîne complète de MLOps pour l'octroi de crédits, assurant l
 
 ## ✨ Fonctionnalités
 
-- ✅ **API RESTful (FastAPI)** : Endpoints pour le scoring unitaire et batch.
+- ✅ **API RESTful (FastAPI)** : Endpoints pour le scoring unitaire et batch optimisés.
+- ✅ **Inférence Accélérée** : Utilisation de **ONNX Runtime** pour réduire la latence de prédiction.
 - ✅ **Base de Données (PostgreSQL)** : Logging asynchrone des requêtes et réponses pour constitution du dataset de production.
 - ✅ **Analyses de Drift (Evidently)** : Notebook dédié pour comparer les données de production vs référence (Training).
 - ✅ **Gestion de Modèle** : Chargement dynamique, versioning MLflow, et rechargement à chaud depuis Hugging Face Hub.
 - ✅ **Interface Streamlit** : Dashboard simple pour tester le scoring manuellement.
+
+---
+
+## ⚡ Optimisation & Performance
+
+### 🚀 Inférence (Latence)
+
+Une attention particulière a été portée à l'optimisation du pipeline d'inférence, passant d'un modèle CatBoost natif à une exécution optimisée via **ONNX Runtime**.
+
+| Version | Temps d'exécution (Moyen) | Gain de performance |
+| :--- | :--- | :--- |
+| **Baseline (Python)** | ~61 ms | - |
+| **Optimisation Code** | ~20 ms | **x3.0** |
+| **ONNX Runtime** | ~18 ms | **x3.4** |
+
+> *Note : Les mesures incluent le pré-traitement et l'inférence pour une requête unitaire.*
+
+### 🐳 Image Docker (Taille)
+
+L'empreinte du container a été drastiquement réduite grâce à une stratégie **Multi-stage Build** combinée au gestionnaire de paquets **uv** :
+1.  **Usage de `python:3.13-slim`** pour une base légère.
+2.  **Exclusion des dépendances de dev** (pytest, black, jupyter... sont ignorés en prod).
+3.  **Nettoyage des artifacts** de build via l'étape intermédiaire.
+
+| Version | Taille de l'image | Réduction |
+| :--- | :--- | :--- |
+| **Standard Build** | ~2.30 Go | - |
+| **Multi-Stage + uv** | **1.02 Go** | **-56%** |
 
 ---
 
@@ -52,7 +82,7 @@ L'application FastAPI se trouve dans `src/api/main.py` et expose les routes suiv
 
 Routes du routeur (`src/api/routes.py`):
 - `GET /router_health` → health du router.
-- `GET /model_status` → état du fichier modèle sur disque (`model.cb`).
+- `GET /model_status` → état du fichier modèle sur disque (`model.onnx` ou `model.cb`).
 - `GET /model_signature` → colonnes attendues (signature MLflow) et nombre de features.
 - `GET /model_info` → métadonnées (version, date, threshold recommandé).
 - `POST /individual_score` → prédiction pour un individu (Pydantic)
@@ -103,7 +133,7 @@ PRET_A_DEPENSER/
 │
 ├── 📂 config/               # Configuration (chemins, logger, etc.)
 ├── 📂 data/                 # Données (raw, processed)
-├── 📂 exported_model/       # Artifacts MLflow (model.cb, MLmodel)
+├── 📂 exported_model/       # Artifacts MLflow (model.onnx, model.cb, MLmodel)
 ├── 📂 notebooks/            # Notebooks (Drift Analysis, Training)
 ├── 📂 scripts/              # Utilitaires HF (upload/download)
 │
@@ -145,7 +175,7 @@ graph TB
 
     Browser -- "POST /individual_score" --> API
     API --> Routes
-    Routes -- "Predict" --> Mservice
+    Routes -- "Predict (ONNX)" --> Mservice
     Routes -- "Log Prediction (Background)" --> DB_Service
     
     Mservice -- "Load Model" --> HF
@@ -170,7 +200,7 @@ sequenceDiagram
 
 	Client->>API: POST /individual_score
 	API->>ModelService: Request Prediction
-	ModelService->>ModelService: Compute Score (CatBoost)
+	ModelService->>ModelService: Compute Score (ONNX Runtime)
 	ModelService-->>API: Result (Score, Decision)
 	API-->>Client: JSON Response (200 OK)
 	
@@ -184,7 +214,7 @@ sequenceDiagram
 
 - `HF_REPO_ID` — identifiant du repo HF (ex: `username/model-repo`) requis pour `POST /reload_model`.
 - `HUGGINGFACE_TOKEN` — token HF (ou `HF_TOKEN`) pour accéder au repo privé.
-- `HF_FILENAME` — nom du fichier dans le repo HF (défaut `model.cb`).
+- `HF_FILENAME` — nom du fichier dans le repo HF (défaut `model.onnx`).
 - `DATABASE_URL` — Connection string PostgreSQL (ex: `postgresql://user:pass@host:5432/db`).
 - `MLFLOW_TRACKING_URI` — (optionnel) point vers le serveur MLflow.
 
@@ -260,4 +290,4 @@ Le projet intègre une pipeline automatisée (`.github/workflows/ci-cd.yml`) :
 
 **Fabien** - [RandomFab](https://github.com/RandomFab)
 
-Merci aux bibliothèques et projets open-source utilisés : FastAPI, MLflow, CatBoost, HuggingFace Hub.
+Merci aux bibliothèques et projets open-source utilisés : FastAPI, MLflow, CatBoost, ONNX, HuggingFace Hub.
