@@ -7,6 +7,8 @@ from catboost import CatBoostClassifier
 from config.logger import logger
 from src.api.schemas import ScoringData
 import functools
+import onnxruntime as ort
+import numpy as np
 
 def get_model_status() -> dict:
         
@@ -110,56 +112,94 @@ def get_model_info():
     }
 
 def load_model_instance():
-    """Charge le modèle CatBoost en mémoire."""
-    filename = os.getenv('HF_FILENAME', 'model.cb')
-    model_path = MODEL_DIR / filename
+    """Charge le modèle ONNX (prioritaire) ou CatBoost en mémoire."""
+    onnx_path = MODEL_DIR / "model.onnx"
+    cb_filename = os.getenv('HF_FILENAME', 'model.cb')
+    cb_path = MODEL_DIR / cb_filename
     
-    if not model_path.exists():
-        logger.warning(f"⚠️ Model file not found at {model_path}")
+    # 1. Essayer de charger ONNX
+    if onnx_path.exists():
+        try:
+            logger.info(f"ℹ️ Loading ONNX model from {onnx_path}...")
+            # On utilise le CPU par défaut pour la portabilité
+            session = ort.InferenceSession(str(onnx_path), providers=['CPUExecutionProvider'])
+            logger.info("✅ ONNX model loaded successfully")
+            return session
+        except Exception as e:
+            logger.error(f"⚠️ Failed to load ONNX model, falling back to CatBoost: {e}")
+
+    # 2. Fallback sur CatBoost
+    if not cb_path.exists():
+        logger.warning(f"⚠️ Model file not found at {cb_path}")
         return None
         
     try:
-        logger.info(f"ℹ️ Loading model from {model_path}...")
+        logger.info(f"ℹ️ Loading CatBoost model from {cb_path}...")
         model = CatBoostClassifier()
-        model.load_model(str(model_path))
-        logger.info(f"✅ Model loaded successfully from {filename}")
+        model.load_model(str(cb_path))
+        logger.info(f"✅ CatBoost model loaded successfully")
         return model
     except Exception as e:
-        logger.error(f"❌ Failed to load model: {e}")
+        logger.error(f"❌ Failed to load CatBoost model: {e}")
         return None
 
-def get_prediction(model: CatBoostClassifier, data_dict: dict):
+def convert_catboost_to_onnx(cb_path: Path, onnx_path: Path):
+    """Convertit un modèle CatBoost existant au format ONNX."""
+    try:
+        logger.info(f"🔄 Converting CatBoost model {cb_path.name} to ONNX...")
+        model = CatBoostClassifier()
+        model.load_model(str(cb_path))
+        
+        model.save_model(
+            str(onnx_path),
+            format="onnx",
+            export_parameters={
+                'onnx_domain': 'ai.catboost',
+                'onnx_model_version': 1,
+                'onnx_doc_string': 'Model for credit scoring',
+                'onnx_graph_name': 'CatBoostModel'
+            }
+        )
+        logger.info(f"✅ Model successfully converted to {onnx_path}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Conversion to ONNX failed: {e}")
+        return False
+
+def get_prediction(model, data_dict: dict):
     if model is None:
         logger.error("❌ Prediction failed: No model instance provided")
         return {'error': 'Model instance is missing'}
     
     signature = get_model_signature()
-
     if not signature['exists']:
         logger.error("❌ Prediction failed: Signature file 'MLmodel' not found")
         return {'error' : 'Signature file not found'}
     
-    # Get columns to ordered values for the model
     columns = signature['columns']
+    ordered_values = [data_dict.get(col['name']) for col in columns]
     
-    ordered_values = []
-    for col in columns:
-        val = data_dict.get(col['name'])
-        ordered_values.append(val)
-    
-    # Get best threshold for prediction (retrieved from signature)
-    best_threshold = signature.get('best_threshold')
-    threshold_state = "Best for this model"
-    if best_threshold is None:
-        best_threshold = 0.5
-        threshold_state = "0.5 by default"
-        logger.warning("⚠️ No threshold recommended for this model. A 0.5 threshold has been attributed by default")
+    best_threshold = signature.get('best_threshold') or 0.5
 
     try:
-        proba_array = model.predict_proba([ordered_values]) 
-        proba = float(proba_array[0][1])
+        # --- Cas 1 : Modèle ONNX ---
+        if isinstance(model, ort.InferenceSession):
+            input_name = model.get_inputs()[0].name
+            # ONNX attend un array numpy 2D (batch_size, n_features)
+            # On convertit les None éventuels en 0.0 pour éviter les crashs ONNX
+            clean_values = [v if v is not None else 0.0 for v in ordered_values]
+            input_data = np.array([clean_values], dtype=np.float32)
+            
+            # session.run renvoie [labels, probabilities]
+            _, probas = model.run(None, {input_name: input_data})
+            # probas est de forme (1, 2) -> [[p0, p1]]
+            proba = float(probas[0][1])
+
+        # --- Cas 2 : Modèle CatBoost Classique ---
+        else:
+            proba_array = model.predict_proba([ordered_values]) 
+            proba = float(proba_array[0][1])
         
-        # 1 = Défaut/Refusé, 0 = Accordé
         is_refused = int(proba >= best_threshold)
         decision = "Refusé" if is_refused == 1 else "Accordé"
 
@@ -170,7 +210,7 @@ def get_prediction(model: CatBoostClassifier, data_dict: dict):
             "decision": decision
         }
         
-        logger.info(f"✅ Prediction successful: Decision={decision}, Score={round(proba, 4)}, Threshold={best_threshold}")
+        logger.info(f"✅ Prediction successful: Decision={decision}, Score={round(proba, 4)}, (Mode={'ONNX' if isinstance(model, ort.InferenceSession) else 'CatBoost'})")
         return result
 
     except Exception as e:

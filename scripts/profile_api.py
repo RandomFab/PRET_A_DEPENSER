@@ -18,7 +18,8 @@ else:
     profiler = cProfile.Profile()
     profiler.enable()
 
-    # On passe le dictionnaire attendu par get_prediction
+    # Deuxième appel pour voir l'effet du cache (get_model_signature)
+    print("\n🚀 Deuxième appel (avec cache)...")
     get_prediction(model, data_dict)
 
     profiler.disable()
