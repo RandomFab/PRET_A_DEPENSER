@@ -9,10 +9,29 @@ from src.model import model_service as model_service_module
 
 
 class DummyModel:
-    """Mock model for testing purposes to avoid loading the real heavy model."""
+    """Mock model for testing purposes to avoid loading the real heavy model.
+    Mimics onnxruntime.InferenceSession behavior.
+    """
+    class MockNodeArg:
+        def __init__(self, name):
+            self.name = name
+
+    def get_inputs(self):
+        return [self.MockNodeArg("float_input")]
+
+    def run(self, output_names, input_feed):
+        # returns [labels, probabilities]
+        # mimic session.run output
+        # probas (1, 2) -> [[p_accord, p_refus]]
+        # We simulate a "Refused" case (0.42 probability of 1/Refused? Wait...)
+        # In model_service.py: proba = float(probas[0][1]) -> probability of class 1
+        # Code says: decision = "Refusé" if is_refused == 1 else "Accordé"
+        # is_refused = int(proba >= best_threshold)
+        # If we want to return a fixed value, we can use 0.42.
+        return [None, [[0.58, 0.42]]]
+
     def predict_proba(self, X):
-        # returns a fixed probability for each row (class 0, class 1)
-        # mimics CatBoost predict_proba output
+        # Legacy method if needed
         return [[0.58, 0.42] for _ in X]
 
 
