@@ -4,9 +4,12 @@ from contextlib import asynccontextmanager
 from src.api.routes import router
 from src.model.model_service import load_model_instance
 from config.logger import logger
+from src.api.database.database import init_db 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Démarrage : Charge la base de données
+    init_db()
     # Démarrage : Charge le modèle dans l'état de l'application
     logger.info("ℹ️ Application starting up...")
     app.state.model = load_model_instance()

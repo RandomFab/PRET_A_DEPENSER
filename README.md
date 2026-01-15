@@ -10,33 +10,36 @@ pinned: false
 <!-- Project title and badges -->
 # 🚀 Pret-à-Dépenser
 
-[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.128+-green.svg)](https://fastapi.tiangolo.com/)
-[![MLflow](https://img.shields.io/badge/MLflow-%3E%3D3.8.1-orange.svg)](https://mlflow.org/)
-[![CatBoost](https://img.shields.io/badge/CatBoost-%3E%3D1.2.8-blue.svg)](https://catboost.ai/)
-[![HuggingFace](https://img.shields.io/badge/HuggingFace--hub-%3E%3D1.2.3-purple.svg)](https://huggingface.co/)
+[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.128+-green.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MLflow](https://img.shields.io/badge/MLflow-%3E%3D3.8.1-orange.svg?logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![CatBoost](https://img.shields.io/badge/CatBoost-%3E%3D1.2.8-yellow.svg)](https://catboost.ai/)
+[![Evidently](https://img.shields.io/badge/Evidently-%3E%3D0.7.20-red.svg)](https://www.evidentlyai.com/)
+[![HuggingFace](https://img.shields.io/badge/HuggingFace-Hub-purple.svg?logo=huggingface&logoColor=white)](https://huggingface.co/)
 
-**Packaging et déploiement d'un modèle CatBoost avec MLflow et Hugging Face Hub.**
+**API de Scoring Crédit : Déploiement, Monitoring et MLOps.**
 
 ---
 
 ## 🎯 Objectif
 
-Automatiser une chaîne reproductible pour déployer un modèle CatBoost :
-- Enregistrement/versioning via MLflow
-- Export des artifacts essentiels (`model.cb`, `MLmodel`, `input_example.json`)
-- Publication et téléchargement depuis Hugging Face Hub
-- Fournir une API HTTP via FastAPI pour la prédiction et la gestion du modèle
+Automatiser une chaîne complète de MLOps pour l'octroi de crédits, assurant la reproductibilité et la surveillance du modèle en production :
+- **Déploiement** d'un modèle CatBoost via une API **FastAPI**.
+- **Tracking** des expériences et centralisation des artifacts avec **MLflow**.
+- **Historisation** des prédictions (inputs/outputs) dans **PostgreSQL**.
+- **Monitoring** de la qualité des données et du *Data Drift* avec **Evidently**.
+- **Interface Utilisateur** interactive avec **Streamlit**.
 
 ---
 
 ## ✨ Fonctionnalités
 
-- ✅ API FastAPI minimale pour health, inspection et scoring
-- ✅ Chargement automatique du modèle au démarrage (injection dans `app.state`)
-- ✅ Endpoints pour signature, info, statut et reload depuis HF
-- ✅ Prédiction individuelle et batch avec validation Pydantic
-- ✅ Scripts d'upload/download vers/depuis Hugging Face Hub
+- ✅ **API RESTful (FastAPI)** : Endpoints pour le scoring unitaire et batch.
+- ✅ **Base de Données (PostgreSQL)** : Logging asynchrone des requêtes et réponses pour constitution du dataset de production.
+- ✅ **Analyses de Drift (Evidently)** : Notebook dédié pour comparer les données de production vs référence (Training).
+- ✅ **Gestion de Modèle** : Chargement dynamique, versioning MLflow, et rechargement à chaud depuis Hugging Face Hub.
+- ✅ **Interface Streamlit** : Dashboard simple pour tester le scoring manuellement.
 
 ---
 
@@ -97,46 +100,65 @@ Réponse de prédiction (exemple):
 
 ```text
 PRET_A_DEPENSER/
+│
 ├── 📂 config/               # Configuration (chemins, logger, etc.)
-│   ├── config.py
-│   └── logger.py
 ├── 📂 data/                 # Données (raw, processed)
-│   └── processed/
-│       └── scoring_template_app.csv
+├── 📂 exported_model/       # Artifacts MLflow (model.cb, MLmodel)
+├── 📂 notebooks/            # Notebooks (Drift Analysis, Training)
 ├── 📂 scripts/              # Utilitaires HF (upload/download)
-│   ├── download_model_from_hf.py
-│   └── upload_model_to_hf.py
-├── 📂 src/                  # Code source
+│
+├── 📂 src/
 │   ├── 🎨 api/              # Backend FastAPI (Modèle, Routes, Schemas)
+│   │   ├── database/        # Modèles SQLAlchemy & Connexion DB
 │   │   ├── main.py
-│   │   ├── model.py
 │   │   ├── routes.py
 │   │   └── schemas.py
 │   ├── 🧠 app/              # Frontend Streamlit
-│   │   ├── main.py
-│   │   └── utils.py
 │   └── ⚙️ model/            # Logique métier & Hubs (MLflow, HF)
-│       ├── hf_interaction.py
-│       ├── mlflow_interaction.py
-│       └── model_service.py
 ├── 🧪 tests/                # Tests unitaires et fonctionnels
 ├── 🐳 Dockerfile            # Packaging Docker
 ├── 🐙 docker-compose.yml    # Orchestration locale
 └── 🚀 start.sh             # Script de démarrage dual (API + App)
 ```
 
-**Architecture (flow principal)**
+### Architecture Technique
 
 ```mermaid
 graph TB
-	A[Start API] --> B[Load model via `load_model_instance`]
-	B --> C{Model in app.state}
-	C -->|Yes| D[Ready for predictions]
-	C -->|No| E[API runs but returns 503 on scoring]
-	F[Reload request POST /reload_model] --> G[download_model_from_hf]
-	G --> H[Store file in `MODEL_DIR`]
-	H --> I[load_model_instance and update `app.state`]
+    subgraph Client
+        Browser[🌍 Frontend Streamlit / User]
+    end
+
+    subgraph "Serveur API (FastAPI)"
+        API[🚀 API Gateway]
+        Routes[🛣️ Router]
+        Mservice[🧠 Model Service]
+        DB_Service[💾 Database Service]
+    end
+
+    subgraph "Stockage & Monitoring"
+        HF[🤗 Hugging Face Hub]
+        PG[(🐘 PostgreSQL)]
+        MLflow[📈 MLflow Tracking]
+        Evidently[📊 Evidently Reports]
+    end
+
+    Browser -- "POST /individual_score" --> API
+    API --> Routes
+    Routes -- "Predict" --> Mservice
+    Routes -- "Log Prediction (Background)" --> DB_Service
+    
+    Mservice -- "Load Model" --> HF
+    DB_Service -- "INSERT prediction_logs" --> PG
+    
+    subgraph "Offline Analysis"
+        NB[📓 Notebook Drift]
+        NB -- "Read Reference" --> MLflow
+        NB -- "Read Production Logs" --> PG
+        NB --> Evidently
+    end
 ```
+
 --- 
 
 ```mermaid
@@ -144,19 +166,16 @@ sequenceDiagram
 	participant Client
 	participant API
 	participant ModelService
-	participant HF
+	participant DB as PostgreSQL
 
-	Client->>API: POST /individual_score — JSON
-	API->>ModelService: validate & reorder inputs
-	ModelService->>ModelService: model.predict_proba
-	ModelService-->>API: score, decision
-	API-->>Client: JSON response
-
-	Client->>API: POST /reload_model
-	API->>HF: hf_hub_download repo_id, filename
-	HF-->>API: local file path
-	API->>ModelService: load_model_instance
-	API-->>Client: reload confirmation
+	Client->>API: POST /individual_score
+	API->>ModelService: Request Prediction
+	ModelService->>ModelService: Compute Score (CatBoost)
+	ModelService-->>API: Result (Score, Decision)
+	API-->>Client: JSON Response (200 OK)
+	
+	Note right of API: Background Task
+	API->>DB: INSERT INTO prediction_logs (inputs, outputs, latency)
 ```
 
 ---
@@ -166,15 +185,30 @@ sequenceDiagram
 - `HF_REPO_ID` — identifiant du repo HF (ex: `username/model-repo`) requis pour `POST /reload_model`.
 - `HUGGINGFACE_TOKEN` — token HF (ou `HF_TOKEN`) pour accéder au repo privé.
 - `HF_FILENAME` — nom du fichier dans le repo HF (défaut `model.cb`).
+- `DATABASE_URL` — Connection string PostgreSQL (ex: `postgresql://user:pass@host:5432/db`).
 - `MLFLOW_TRACKING_URI` — (optionnel) point vers le serveur MLflow.
 
-Ces variables peuvent être mises dans `.devenv` (utilisé par le projet) ou exportées dans votre CI.
+Ces variables peuvent être mises dans `.env.dev` (utilisé par le projet).
 
 ---
 
-## 🚀 Installation & Déploiement Local
+## 🚀 Installation & Déploiement
 
-### 🐍 Installation Développement (venv)
+### 🐳 Via Docker (Recommandé)
+
+Le projet utilise **Docker Compose** pour orchestrer l'API, la Base de Données, et l'interface utilisateur.
+
+1.  Créer le fichier `.env.dev` ou `.env` avec les variables ci-dessus.
+2.  Lancer la stack :
+    ```bash
+    docker-compose up --build -d
+    ```
+3.  Accéder aux services :
+    - **FastAPI (Docs)** : [http://localhost:8000/docs](http://localhost:8000/docs)
+    - **Streamlit** : [http://localhost:7860](http://localhost:7860)
+
+### 🐍 Installation Locale (Dev)
+
 Préréquis : **Python 3.13+** et **uv** (recommandé).
 
 1.  **Cloner le dépôt** :
@@ -184,30 +218,22 @@ Préréquis : **Python 3.13+** et **uv** (recommandé).
     ```
 2.  **Installer les dépendances** :
     ```bash
-    uv sync --frozen
+    uv sync
     ```
-3.  **Lancer séparément (Dev)** :
-    - **API** : `uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload`
-    - **App** : `uv run streamlit run src/app/main.py --server.port 7860`
+3.  **Lancer les services** :
+    - S'assurer qu'une base PostgreSQL tourne localement.
+    - API : `uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload`
+    - App : `uv run streamlit run src/app/main.py`
 
 ---
 
-## 🐳 Déploiement Local (Docker)
+## 🧪 Monitoring & Drift Analysis
 
-La méthode la plus simple pour reproduire l'environnement de production.
+Le projet intègre une surveillance de la dérive des données (Data Drift) :
 
-1.  **Configuration** : Créez un fichier `.devenv` avec vos tokens si nécessaire.
-2.  **Lancement** :
-    ```bash
-    docker compose up --build -d
-    ```
-3.  **Accès** :
-    - **Streamlit (UI)** : [http://localhost:7860](http://localhost:7860)
-    - **FastAPI (Docs)** : [http://localhost:8000/docs](http://localhost:8000/docs)
-
-Le conteneur utilise le script `start.sh` pour orchestrer le démarrage de l'API, attendre son initialisation, puis lancer l'interface Streamlit.  
-HF ne proposant qu'un port (7870), c'est la méthode la plus simple pour déployer le couple API + APP.  
-Un multi-conteners serait plus approprié sur un VPS par exemple.
+1. Les prédictions faites en production sont enregistrées dans PostgreSQL.
+2. Un notebook d'analyse compare ces données avec le dataset de référence (Entraînement).
+3. **Usage** : Ouvrir `notebooks/drift_analysis.ipynb` et exécuter toutes les cellules pour générer le rapport HTML `data_drift_report.html` (Evidently).
 
 ---
 
