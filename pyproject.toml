@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "catboost>=1.2.8",
     "evidently>=0.7.20",
     "fastapi[standard]>=0.128.0",
     "huggingface-hub>=1.2.3",

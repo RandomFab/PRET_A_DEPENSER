@@ -5,7 +5,6 @@ from config.config import BASE_DIR, MODEL_DIR
 from config.logger import logger
 from src.model.hf_interaction import upload_model_to_hf
 from src.model.mlflow_interaction import set_tracking_uri, download_model_artifacts, find_model_file
-from src.model.model_service import convert_catboost_to_onnx
 
 load_dotenv(BASE_DIR / ".env.dev")
 
@@ -31,16 +30,6 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Impossible de télécharger les artifacts MLflow: {e}")
         raise
-
-    # Conversion en ONNX avant upload
-    cb_filename = os.getenv('HF_FILENAME', 'model.cb')
-    cb_path = MODEL_DIR / cb_filename
-    onnx_path = MODEL_DIR / "model.onnx"
-
-    if cb_path.exists():
-        convert_catboost_to_onnx(cb_path, onnx_path)
-    else:
-        logger.warning(f"⚠️ Fichier source {cb_path} non trouvé, skip conversion ONNX")
 
     # Find model file
     # model_file = find_model_file(MODEL_DIR)
