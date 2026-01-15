@@ -31,7 +31,7 @@ jobs:
       - name: Installer uv et les dépendances
         run: |
           pip install uv
-          uv sync --frozen
+          uv sync --frozen --extra dev
 
       - name: Lancer les tests avec couverture
         run: uv run pytest --maxfail=1 --disable-warnings -q --cov=. --cov-report=html
