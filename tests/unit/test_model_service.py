@@ -32,6 +32,7 @@ class TestModelService:
     @patch('pathlib.Path.exists')
     def test_get_signature_missing(self, mock_exists):
         """If MLmodel is missing, returns an empty but consistent structure."""
+        model_service.get_model_signature.cache_clear()
         mock_exists.return_value = False
         sig = model_service.get_model_signature()
         assert sig["exists"] is False
@@ -41,6 +42,7 @@ class TestModelService:
     @patch('pathlib.Path.exists', return_value=True)
     def test_get_signature_parsing(self, mock_exists):
         """Verifies standard YAML parsing."""
+        model_service.get_model_signature.cache_clear()
         yaml_content = """
 signature:
   inputs:
@@ -62,6 +64,7 @@ metadata:
     @patch('pathlib.Path.exists', return_value=True)
     def test_get_signature_with_json_string(self, mock_exists):
         """Verifies parsing when MLflow stores the signature as a JSON string."""
+        model_service.get_model_signature.cache_clear()
         # Tricky case where inputs is a string, not a list
         json_inputs = json.dumps(["A", "B", "C"])
         yaml_content = f"""
