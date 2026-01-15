@@ -2,14 +2,22 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from src.api.routes import router
-from src.model.model_service import load_model_instance
+from src.model.model_service import load_model_instance, get_model_signature, get_model_info
 from config.logger import logger
+from src.api.database.database import init_db 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Démarrage : Charge la base de données
+    init_db()
     # Démarrage : Charge le modèle dans l'état de l'application
     logger.info("ℹ️ Application starting up...")
     app.state.model = load_model_instance()
+    
+    # "Warm-up" du cache pour la signature et les infos du modèle
+    get_model_signature()
+    get_model_info()
+
     if app.state.model:
         logger.info("✅ Model successfully injected into app state")
     else:

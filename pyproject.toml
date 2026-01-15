@@ -5,15 +5,27 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "catboost>=1.2.8",
     "fastapi[standard]>=0.128.0",
-    "huggingface-hub>=1.2.3",
-    "mlflow>=3.8.1",
-    "pandas>=2.2.3",
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "requests>=2.32.3",
-    "streamlit>=1.52.2",
+    "onnxruntime>=1.20.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "huggingface-hub>=0.20.0",
+    "pyyaml>=6.0.0",
+    "streamlit>=1.30.0",
+    "seaborn>=0.13.0",
+]
+
+[project.optional-dependencies]
+monitoring = [
+    "evidently>=0.4.0",
+]
+dev = [
+    "mlflow>=2.10.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ipykernel>=6.29.0",
 ]
 
 [tool.pytest.ini_options]

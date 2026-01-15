@@ -47,10 +47,42 @@
             "type": "shell",
             "command": "uv run streamlit run src/app/main.py",
             "group": "none",
-                "presentation": {
-            "reveal": "always",
-            "panel": "new"
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "📥 Download model from hf",
+            "type": "shell",
+            "command": "uv run -m scripts.download_model_from_hf",
+            "group": "none",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "🧪 Running profile_api",
+            "type": "shell",
+            "command": "uv run -m scripts.profile_api",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "🧪 Running benchmark",
+            "type": "shell",
+            "command": "uv run -m scripts.compare_cb_onnx",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
             }
         }
+
     ]
 }

@@ -16,7 +16,8 @@ jobs:
     env:
       HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
       HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
-  
+      APP_ENV: production  # On force 'production' pour utiliser SQLite pendant les tests CI
+      DATABASE_URL: sqlite:///./test_db.db
     steps:
 
       - name: check out du code
@@ -30,7 +31,7 @@ jobs:
       - name: Installer uv et les dépendances
         run: |
           pip install uv
-          uv sync --frozen
+          uv sync --frozen --extra dev
 
       - name: Lancer les tests avec couverture
         run: uv run pytest --maxfail=1 --disable-warnings -q --cov=. --cov-report=html

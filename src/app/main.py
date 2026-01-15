@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import sys
 from pathlib import Path
-import concurrent.futures
 from utils import *
 
 # Ajouter la racine du projet au chemin de recherche de modules

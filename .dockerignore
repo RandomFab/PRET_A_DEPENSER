@@ -1,7 +1,6 @@
 .git
 .gitignore
-.devenv
-.prodenv
+.env*
 .venv
 __pycache__
 data
