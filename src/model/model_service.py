@@ -6,6 +6,7 @@ import yaml
 from catboost import CatBoostClassifier
 from config.logger import logger
 from src.api.schemas import ScoringData
+import functools
 
 def get_model_status() -> dict:
         
@@ -27,7 +28,8 @@ def get_model_status() -> dict:
         })
 
     return status
-
+# --- Chargement de la signature au démarrage ---
+@functools.lru_cache(maxsize=1)
 def get_model_signature() -> dict:
     MLmodel_path = MODEL_DIR / "MLmodel"
 
@@ -77,6 +79,7 @@ def get_model_signature() -> dict:
         "best_threshold": threshold
     }
 
+@functools.lru_cache(maxsize=1)
 def get_model_info():
     MLmodel_path = MODEL_DIR / "MLmodel"
 
@@ -144,12 +147,10 @@ def get_prediction(model: CatBoostClassifier, data_dict: dict):
         val = data_dict.get(col['name'])
         ordered_values.append(val)
     
-    # Get best threshold for prediction
-
-    infos =  get_model_info()
-    best_threshold = infos.get('best_threshold')
+    # Get best threshold for prediction (retrieved from signature)
+    best_threshold = signature.get('best_threshold')
     threshold_state = "Best for this model"
-    if best_threshold == None:
+    if best_threshold is None:
         best_threshold = 0.5
         threshold_state = "0.5 by default"
         logger.warning("⚠️ No threshold recommended for this model. A 0.5 threshold has been attributed by default")
